@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/member")
+@RequestMapping("/members")
 public class MemberController {
     @Autowired
     private MemberService memberService;
@@ -29,15 +29,15 @@ public class MemberController {
         return ResultBuilder.success(memberVo);
     }
 
-    @GetMapping("/list")
+    @GetMapping
     public Result<IPage<MemberVo>> memberList(MemberDto memberDto) {
         IPage<MemberVo> pageList = memberService.memberList(memberDto);
         return ResultBuilder.success(pageList);
     }
 
-    @PutMapping
-    public Result<Void> updateMember(@RequestBody MemberDto memberDto) {
-        memberService.updateMember(memberDto);
+    @PutMapping("/{id}")
+    public Result<Void> updateMember(@PathVariable String id, @RequestBody MemberDto memberDto) {
+        memberService.updateMember(id, memberDto);
         return ResultBuilder.success();
     }
 

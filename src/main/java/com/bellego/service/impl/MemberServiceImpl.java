@@ -30,7 +30,7 @@ public class MemberServiceImpl extends ServiceImpl<MemberMapper, Member> impleme
     }
 
     @Override
-    public void updateMember(MemberDto memberDto) {
+    public void updateMember(String id, MemberDto memberDto) {
 
     }
 
