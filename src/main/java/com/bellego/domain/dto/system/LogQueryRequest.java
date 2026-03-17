@@ -1,0 +1,13 @@
+package com.bellego.domain.dto.system;
+
+import com.bellego.common.PageQuery;
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+
+@Data
+@EqualsAndHashCode(callSuper = true)
+public class LogQueryRequest extends PageQuery {
+    private String operatorName;
+    private String module;
+}
+
