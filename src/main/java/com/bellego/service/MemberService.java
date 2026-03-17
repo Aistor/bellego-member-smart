@@ -1,22 +1,17 @@
 package com.bellego.service;
 
-import com.baomidou.mybatisplus.core.metadata.IPage;
-import com.bellego.domain.dto.MemberDto;
-import com.bellego.domain.vo.MemberVo;
-import org.springframework.web.bind.annotation.PathVariable;
-
-import java.util.List;
+import com.bellego.common.result.PageResult;
+import com.bellego.domain.dto.member.MemberQueryRequest;
+import com.bellego.domain.dto.member.MemberUpsertRequest;
+import com.bellego.domain.entity.Member;
+import org.springframework.web.multipart.MultipartFile;
 
 public interface MemberService {
-    void saveMember(MemberDto memberDto);
-
-    MemberVo getMemberById(String id);
-
-    IPage<MemberVo> memberList(MemberDto memberDto);
-
-    void updateMember(String id, MemberDto memberDto);
-
-    void deleteById(String id);
-
-    void batchDelete(List<String> ids);
+    PageResult<Member> page(MemberQueryRequest request);
+    Member getById(String id);
+    void create(MemberUpsertRequest request);
+    void update(String id, MemberUpsertRequest request);
+    void updateStatus(String id, Integer status);
+    void importCsv(MultipartFile file);
 }
+

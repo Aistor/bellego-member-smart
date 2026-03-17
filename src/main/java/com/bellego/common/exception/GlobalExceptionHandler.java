@@ -3,41 +3,35 @@ package com.bellego.common.exception;
 import com.bellego.common.result.Result;
 import com.bellego.common.result.ResultBuilder;
 import com.bellego.common.result.ResultEnum;
-import lombok.extern.slf4j.Slf4j;
+import jakarta.validation.ConstraintViolationException;
+import org.springframework.validation.BindException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
-/**
- * 全局异常处理器
- */
-@Slf4j
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-    /**
-     * 处理业务异常
-     */
     @ExceptionHandler(BusinessException.class)
-    public Result<Void> handleBusinessException(BusinessException e) {
-        log.warn("业务异常: {}", e.getMessage());
-        return ResultBuilder.error(ResultEnum.BAD_REQUEST, e.getMessage());
+    public Result<Void> handleBusinessException(BusinessException ex) {
+        return ResultBuilder.error(ResultEnum.BAD_REQUEST, ex.getMessage());
     }
 
-    /**
-     * 处理参数校验异常
-     */
-    @ExceptionHandler(IllegalArgumentException.class)
-    public Result<Void> handleIllegalArgumentException(IllegalArgumentException e) {
-        log.warn("参数异常: {}", e.getMessage());
-        return ResultBuilder.error(ResultEnum.NOT_ACCEPTABLE, e.getMessage());
+    @ExceptionHandler({MethodArgumentNotValidException.class, BindException.class, ConstraintViolationException.class, IllegalArgumentException.class})
+    public Result<Void> handleValidationException(Exception ex) {
+        String message = ex.getMessage();
+        if (ex instanceof MethodArgumentNotValidException validException && validException.getBindingResult().getFieldError() != null) {
+            message = validException.getBindingResult().getFieldError().getDefaultMessage();
+        }
+        if (ex instanceof BindException bindException && bindException.getBindingResult().getFieldError() != null) {
+            message = bindException.getBindingResult().getFieldError().getDefaultMessage();
+        }
+        return ResultBuilder.error(ResultEnum.BAD_REQUEST, message);
     }
 
-    /**
-     * 处理所有其他异常
-     */
     @ExceptionHandler(Exception.class)
-    public Result<Void> handleException(Exception e) {
-        log.error("系统异常: ", e);
-        return ResultBuilder.error(ResultEnum.INTERNAL_SERVER_ERROR, e.getMessage());
+    public Result<Void> handleException(Exception ex) {
+        return ResultBuilder.error(ResultEnum.INTERNAL_SERVER_ERROR, ex.getMessage());
     }
 }
+

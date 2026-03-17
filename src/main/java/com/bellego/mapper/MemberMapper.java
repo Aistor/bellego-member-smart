@@ -5,5 +5,6 @@ import com.bellego.domain.entity.Member;
 import org.apache.ibatis.annotations.Mapper;
 
 @Mapper
-public interface MemberMapper extends BaseMapper<Member>{
+public interface MemberMapper extends BaseMapper<Member> {
 }
+

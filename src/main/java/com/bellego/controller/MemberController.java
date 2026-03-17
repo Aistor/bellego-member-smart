@@ -1,55 +1,71 @@
 package com.bellego.controller;
 
-import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.bellego.aop.LogOperation;
+import com.bellego.common.result.PageResult;
 import com.bellego.common.result.Result;
 import com.bellego.common.result.ResultBuilder;
-import com.bellego.domain.dto.MemberDto;
-import com.bellego.domain.vo.MemberVo;
+import com.bellego.domain.dto.common.StatusUpdateRequest;
+import com.bellego.domain.dto.member.MemberQueryRequest;
+import com.bellego.domain.dto.member.MemberUpsertRequest;
+import com.bellego.domain.entity.Member;
 import com.bellego.service.MemberService;
-import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.validation.Valid;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
-@RequestMapping("/members")
+@RequestMapping("/api/v1/members")
 public class MemberController {
-    @Autowired
-    private MemberService memberService;
 
-    @PostMapping
-    public Result<Void> saveMember(@RequestBody MemberDto memberDto) {
-        memberService.saveMember(memberDto);
-        return ResultBuilder.success();
-    }
+    private final MemberService memberService;
 
-    @GetMapping("/{id}")
-    public Result<MemberVo> getMemberById(@PathVariable String id) {
-        MemberVo memberVo = memberService.getMemberById(id);
-        return ResultBuilder.success(memberVo);
+    public MemberController(MemberService memberService) {
+        this.memberService = memberService;
     }
 
     @GetMapping
-    public Result<IPage<MemberVo>> memberList(MemberDto memberDto) {
-        IPage<MemberVo> pageList = memberService.memberList(memberDto);
-        return ResultBuilder.success(pageList);
+    @PreAuthorize("hasAuthority('member:view')")
+    public Result<PageResult<Member>> page(MemberQueryRequest request) {
+        return ResultBuilder.success(memberService.page(request));
+    }
+
+    @GetMapping("/{id}")
+    @PreAuthorize("hasAuthority('member:view')")
+    public Result<Member> get(@PathVariable String id) {
+        return ResultBuilder.success(memberService.getById(id));
+    }
+
+    @PostMapping
+    @PreAuthorize("hasAuthority('member:add')")
+    @LogOperation(module = "会员管理", action = "新增会员")
+    public Result<Void> create(@Valid @RequestBody MemberUpsertRequest request) {
+        memberService.create(request);
+        return ResultBuilder.success();
     }
 
     @PutMapping("/{id}")
-    public Result<Void> updateMember(@PathVariable String id, @RequestBody MemberDto memberDto) {
-        memberService.updateMember(id, memberDto);
+    @PreAuthorize("hasAuthority('member:edit')")
+    @LogOperation(module = "会员管理", action = "修改会员")
+    public Result<Void> update(@PathVariable String id, @Valid @RequestBody MemberUpsertRequest request) {
+        memberService.update(id, request);
         return ResultBuilder.success();
     }
 
-    @DeleteMapping("/{id}")
-    public Result<Void> deleteById(@PathVariable String id) {
-        memberService.deleteById(id);
+    @PutMapping("/{id}/status")
+    @PreAuthorize("hasAuthority('member:edit')")
+    @LogOperation(module = "会员管理", action = "修改会员状态")
+    public Result<Void> updateStatus(@PathVariable String id, @Valid @RequestBody StatusUpdateRequest request) {
+        memberService.updateStatus(id, request.getStatus());
         return ResultBuilder.success();
     }
 
-    @PostMapping("/batch/delete")
-    public Result<Void> batchDelete(@RequestBody List<String> ids) {
-        memberService.batchDelete(ids);
+    @PostMapping("/import")
+    @PreAuthorize("hasAuthority('member:import')")
+    @LogOperation(module = "会员管理", action = "批量导入会员")
+    public Result<Void> importCsv(@RequestPart MultipartFile file) {
+        memberService.importCsv(file);
         return ResultBuilder.success();
     }
 }
+

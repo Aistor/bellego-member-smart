@@ -8,20 +8,15 @@ spring:
     url: jdbc:mysql://localhost:3306/bellego?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8&allowMultiQueries=true&useSSL=false&allowPublicKeyRetrieval=true
     username: root
     password: 123456
+  jackson:
+    time-zone: Asia/Shanghai
+    date-format: yyyy-MM-dd HH:mm:ss
 mybatis-plus:
-  global-config:
-    db-config:
-      # 主键策略: auto,数据库自增ID; assign_id,雪花算法ID(Long、Integer、String); assign_uuid,UUID(String)
-      id-type: assign_uuid
-      # 更新时的字段验证策略: not_null,仅在字段值不为NULL时更新该字段
-      update-strategy: not_null
   configuration:
-    # 打印SQL
-    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
-    # 下划线转驼峰
     map-underscore-to-camel-case: true
-    # 关闭MyBatis二级缓存
-    cache-enabled: false
-    # 设置本地缓存作用域
-    local-cache-scope: SESSION
-  mapper-locations: classpath:/mapper/**/**.xml
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+bellego:
+  jwt:
+    secret: bellego-member-smart-jwt-secret-key-2026-demo
+    expire-millis: 86400000
+

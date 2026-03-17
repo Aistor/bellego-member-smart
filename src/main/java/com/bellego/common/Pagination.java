@@ -7,3 +7,4 @@ public class Pagination {
     private Long pageSize=10L;
     private Long currentPage=1L;
 }
+
