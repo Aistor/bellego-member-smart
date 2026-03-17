@@ -17,6 +17,7 @@ import com.bellego.mapper.PermissionMapper;
 import com.bellego.mapper.RolePermissionMapper;
 import com.bellego.security.model.LoginAdmin;
 import com.bellego.service.AdminService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,20 +25,16 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Date;
 import java.util.List;
 
+@Slf4j
 @Service
 public class AdminServiceImpl implements AdminService {
-
     private final AdminMapper adminMapper;
     private final AdminRoleMapper adminRoleMapper;
     private final RolePermissionMapper rolePermissionMapper;
     private final PermissionMapper permissionMapper;
     private final PasswordEncoder passwordEncoder;
 
-    public AdminServiceImpl(AdminMapper adminMapper,
-                            AdminRoleMapper adminRoleMapper,
-                            RolePermissionMapper rolePermissionMapper,
-                            PermissionMapper permissionMapper,
-                            PasswordEncoder passwordEncoder) {
+    public AdminServiceImpl(AdminMapper adminMapper, AdminRoleMapper adminRoleMapper, RolePermissionMapper rolePermissionMapper, PermissionMapper permissionMapper, PasswordEncoder passwordEncoder) {
         this.adminMapper = adminMapper;
         this.adminRoleMapper = adminRoleMapper;
         this.rolePermissionMapper = rolePermissionMapper;
@@ -47,12 +44,7 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     public PageResult<Admin> page(AdminQueryRequest request) {
-        LambdaQueryWrapper<Admin> wrapper = new LambdaQueryWrapper<Admin>()
-                .eq(request.getStatus() != null, Admin::getStatus, request.getStatus())
-                .and(request.getKeyword() != null && !request.getKeyword().isBlank(), q -> q.like(Admin::getUsername, request.getKeyword())
-                        .or().like(Admin::getRealName, request.getKeyword())
-                        .or().like(Admin::getPhone, request.getKeyword()))
-                .orderByDesc(Admin::getCreateTime);
+        LambdaQueryWrapper<Admin> wrapper = new LambdaQueryWrapper<Admin>().eq(request.getStatus() != null, Admin::getStatus, request.getStatus()).and(request.getKeyword() != null && !request.getKeyword().isBlank(), q -> q.like(Admin::getUsername, request.getKeyword()).or().like(Admin::getRealName, request.getKeyword()).or().like(Admin::getPhone, request.getKeyword())).orderByDesc(Admin::getCreateTime);
         Page<Admin> page = adminMapper.selectPage(new Page<>(request.getPageNum(), request.getPageSize()), wrapper);
         page.getRecords().forEach(admin -> admin.setPassword(null));
         return PageResult.of(page);
@@ -61,18 +53,16 @@ public class AdminServiceImpl implements AdminService {
     @Override
     public Admin getById(String id) {
         Admin admin = adminMapper.selectById(id);
-        if (admin == null) {
-            throw new BusinessException("管理员不存在");
-        }
+        if (admin == null) throw new BusinessException("Admin not found");
         admin.setPassword(null);
         return admin;
     }
 
     @Override
     public void create(AdminUpsertRequest request) {
-        if (adminMapper.selectOne(new LambdaQueryWrapper<Admin>().eq(Admin::getUsername, request.getUsername())) != null) {
-            throw new BusinessException("用户名已存在");
-        }
+        log.info("Creating admin, username={}", request.getUsername());
+        if (adminMapper.selectOne(new LambdaQueryWrapper<Admin>().eq(Admin::getUsername, request.getUsername())) != null)
+            throw new BusinessException("Username already exists");
         Admin admin = new Admin();
         admin.setUsername(request.getUsername());
         admin.setPassword(passwordEncoder.encode(request.getPassword() == null || request.getPassword().isBlank() ? "123456" : request.getPassword()));
@@ -85,14 +75,12 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     public void update(String id, AdminUpsertRequest request) {
+        log.info("Updating admin, id={}", id);
         Admin admin = adminMapper.selectById(id);
-        if (admin == null) {
-            throw new BusinessException("管理员不存在");
-        }
+        if (admin == null) throw new BusinessException("Admin not found");
         admin.setUsername(request.getUsername());
-        if (request.getPassword() != null && !request.getPassword().isBlank()) {
+        if (request.getPassword() != null && !request.getPassword().isBlank())
             admin.setPassword(passwordEncoder.encode(request.getPassword()));
-        }
         admin.setRealName(request.getRealName());
         admin.setPhone(request.getPhone());
         admin.setStatus(request.getStatus());
@@ -102,16 +90,16 @@ public class AdminServiceImpl implements AdminService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void delete(String id) {
+        log.info("Deleting admin, id={}", id);
         adminMapper.deleteById(id);
         adminRoleMapper.delete(new LambdaQueryWrapper<AdminRole>().eq(AdminRole::getAdminId, id));
     }
 
     @Override
     public void updateStatus(String id, Integer status) {
+        log.info("Updating admin status, id={}, status={}", id, status);
         Admin admin = adminMapper.selectById(id);
-        if (admin == null) {
-            throw new BusinessException("管理员不存在");
-        }
+        if (admin == null) throw new BusinessException("Admin not found");
         admin.setStatus(status);
         adminMapper.updateById(admin);
     }
@@ -119,6 +107,7 @@ public class AdminServiceImpl implements AdminService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void assignRoles(String id, AdminRoleAssignRequest request) {
+        log.info("Assigning roles to admin, id={}, roleCount={}", id, request.getRoleIds().size());
         adminRoleMapper.delete(new LambdaQueryWrapper<AdminRole>().eq(AdminRole::getAdminId, id));
         request.getRoleIds().forEach(roleId -> {
             AdminRole adminRole = new AdminRole();
@@ -136,26 +125,16 @@ public class AdminServiceImpl implements AdminService {
     @Override
     public LoginAdmin loadLoginAdmin(String adminId) {
         Admin admin = adminMapper.selectById(adminId);
-        if (admin == null) {
-            throw new BusinessException("管理员不存在");
-        }
+        if (admin == null) throw new BusinessException("Admin not found");
         return new LoginAdmin(admin, findPermissionCodes(adminId));
     }
 
     @Override
     public List<String> findPermissionCodes(String adminId) {
-        List<String> roleIds = adminRoleMapper.selectList(new LambdaQueryWrapper<AdminRole>().eq(AdminRole::getAdminId, adminId))
-                .stream().map(AdminRole::getRoleId).toList();
-        if (roleIds.isEmpty()) {
-            return List.of();
-        }
-        List<String> permissionIds = rolePermissionMapper.selectList(new LambdaQueryWrapper<RolePermission>().in(RolePermission::getRoleId, roleIds))
-                .stream().map(RolePermission::getPermissionId).distinct().toList();
-        if (permissionIds.isEmpty()) {
-            return List.of();
-        }
-        return permissionMapper.selectList(new LambdaQueryWrapper<Permission>().in(Permission::getId, permissionIds))
-                .stream().map(Permission::getCode).distinct().toList();
+        List<String> roleIds = adminRoleMapper.selectList(new LambdaQueryWrapper<AdminRole>().eq(AdminRole::getAdminId, adminId)).stream().map(AdminRole::getRoleId).toList();
+        if (roleIds.isEmpty()) return List.of();
+        List<String> permissionIds = rolePermissionMapper.selectList(new LambdaQueryWrapper<RolePermission>().in(RolePermission::getRoleId, roleIds)).stream().map(RolePermission::getPermissionId).distinct().toList();
+        if (permissionIds.isEmpty()) return List.of();
+        return permissionMapper.selectList(new LambdaQueryWrapper<Permission>().in(Permission::getId, permissionIds)).stream().map(Permission::getCode).distinct().toList();
     }
 }
-

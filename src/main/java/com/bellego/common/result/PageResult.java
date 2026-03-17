@@ -6,6 +6,7 @@ import lombok.Data;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.function.Function;
 
 @Data
 @Builder
@@ -32,5 +33,13 @@ public class PageResult<T> {
                 .records(records == null ? Collections.emptyList() : records)
                 .build();
     }
-}
 
+    public <R> PageResult<R> map(Function<T, R> mapper) {
+        return PageResult.<R>builder()
+                .pageNum(pageNum)
+                .pageSize(pageSize)
+                .total(total)
+                .records(records == null ? Collections.emptyList() : records.stream().map(mapper).toList())
+                .build();
+    }
+}

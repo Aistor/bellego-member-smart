@@ -19,6 +19,7 @@ import com.bellego.service.ConsumptionService;
 import com.bellego.service.MemberLevelService;
 import com.bellego.service.PointDetailService;
 import com.bellego.service.PointRuleService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -27,9 +28,9 @@ import java.math.BigDecimal;
 import java.util.Date;
 import java.util.List;
 
+@Slf4j
 @Service
 public class ConsumptionServiceImpl implements ConsumptionService {
-
     private final MemberConsumptionMapper consumptionMapper;
     private final MemberMapper memberMapper;
     private final StoreMapper storeMapper;
@@ -38,13 +39,7 @@ public class ConsumptionServiceImpl implements ConsumptionService {
     private final MemberLevelService memberLevelService;
     private final CsvImportUtils csvImportUtils;
 
-    public ConsumptionServiceImpl(MemberConsumptionMapper consumptionMapper,
-                                  MemberMapper memberMapper,
-                                  StoreMapper storeMapper,
-                                  PointRuleService pointRuleService,
-                                  PointDetailService pointDetailService,
-                                  MemberLevelService memberLevelService,
-                                  CsvImportUtils csvImportUtils) {
+    public ConsumptionServiceImpl(MemberConsumptionMapper consumptionMapper, MemberMapper memberMapper, StoreMapper storeMapper, PointRuleService pointRuleService, PointDetailService pointDetailService, MemberLevelService memberLevelService, CsvImportUtils csvImportUtils) {
         this.consumptionMapper = consumptionMapper;
         this.memberMapper = memberMapper;
         this.storeMapper = storeMapper;
@@ -56,37 +51,27 @@ public class ConsumptionServiceImpl implements ConsumptionService {
 
     @Override
     public PageResult<MemberConsumption> page(ConsumptionQueryRequest request) {
-        LambdaQueryWrapper<MemberConsumption> wrapper = new LambdaQueryWrapper<MemberConsumption>()
-                .eq(request.getMemberId() != null && !request.getMemberId().isBlank(), MemberConsumption::getMemberId, request.getMemberId())
-                .eq(request.getStoreId() != null && !request.getStoreId().isBlank(), MemberConsumption::getStoreId, request.getStoreId())
-                .orderByDesc(MemberConsumption::getConsumeTime);
-        Page<MemberConsumption> page = consumptionMapper.selectPage(new Page<>(request.getPageNum(), request.getPageSize()), wrapper);
-        return PageResult.of(page);
+        LambdaQueryWrapper<MemberConsumption> wrapper = new LambdaQueryWrapper<MemberConsumption>().eq(request.getMemberId() != null && !request.getMemberId().isBlank(), MemberConsumption::getMemberId, request.getMemberId()).eq(request.getStoreId() != null && !request.getStoreId().isBlank(), MemberConsumption::getStoreId, request.getStoreId()).orderByDesc(MemberConsumption::getConsumeTime);
+        return PageResult.of(consumptionMapper.selectPage(new Page<>(request.getPageNum(), request.getPageSize()), wrapper));
     }
 
     @Override
     public MemberConsumption getById(String id) {
         MemberConsumption consumption = consumptionMapper.selectById(id);
-        if (consumption == null) {
-            throw new BusinessException("消费记录不存在");
-        }
+        if (consumption == null) throw new BusinessException("Consumption not found");
         return consumption;
     }
 
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void create(ConsumptionCreateRequest request) {
+        log.info("Creating consumption, memberId={}, storeId={}, amount={}", request.getMemberId(), request.getStoreId(), request.getAmount());
         Member member = memberMapper.selectById(request.getMemberId());
-        if (member == null) {
-            throw new BusinessException("会员不存在");
-        }
+        if (member == null) throw new BusinessException("Member not found");
         Store store = storeMapper.selectById(request.getStoreId());
-        if (store == null) {
-            throw new BusinessException("门店不存在");
-        }
+        if (store == null) throw new BusinessException("Store not found");
         Date consumeTime = request.getConsumeTime() == null ? new Date() : request.getConsumeTime();
         int earnedPoints = calculatePoints(member, request.getAmount());
-
         MemberConsumption consumption = new MemberConsumption();
         consumption.setMemberId(member.getId());
         consumption.setStoreId(store.getId());
@@ -109,11 +94,11 @@ public class ConsumptionServiceImpl implements ConsumptionService {
         pointDetail.setBalance(member.getTotalPoints());
         pointDetail.setSource("consumption");
         pointDetail.setSourceId(consumption.getId());
-        pointDetail.setRemark("消费积分入账");
+        pointDetail.setRemark("consumption point income");
         pointDetail.setCreateTime(new Date());
         pointDetailService.save(pointDetail);
-
         memberLevelService.upgradeMemberLevelIfNeeded(member.getId());
+        log.info("Consumption created, id={}, earnedPoints={}", consumption.getId(), earnedPoints);
     }
 
     @Override
@@ -126,22 +111,16 @@ public class ConsumptionServiceImpl implements ConsumptionService {
             request.setAmount(new BigDecimal(parts[2].trim()));
             return request;
         });
+        log.info("Importing consumptions, count={}", requests.size());
         requests.forEach(this::create);
     }
 
     private int calculatePoints(Member member, BigDecimal amount) {
         PointRule pointRule = pointRuleService.matchConsumptionRule(member.getLevelId());
-        if (pointRule == null) {
-            return 0;
-        }
-        if (pointRule.getMinAmount() != null && amount.compareTo(pointRule.getMinAmount()) < 0) {
-            return 0;
-        }
+        if (pointRule == null) return 0;
+        if (pointRule.getMinAmount() != null && amount.compareTo(pointRule.getMinAmount()) < 0) return 0;
         int points = amount.multiply(BigDecimal.valueOf(pointRule.getPointsPerUnit())).intValue();
-        if (pointRule.getMaxPoints() != null) {
-            points = Math.min(points, pointRule.getMaxPoints());
-        }
+        if (pointRule.getMaxPoints() != null) points = Math.min(points, pointRule.getMaxPoints());
         return Math.max(points, 0);
     }
 }
-

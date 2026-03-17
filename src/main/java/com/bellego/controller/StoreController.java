@@ -4,10 +4,11 @@ import com.bellego.aop.LogOperation;
 import com.bellego.common.result.PageResult;
 import com.bellego.common.result.Result;
 import com.bellego.common.result.ResultBuilder;
+import com.bellego.common.util.VoMapper;
 import com.bellego.domain.dto.common.StatusUpdateRequest;
 import com.bellego.domain.dto.system.StoreQueryRequest;
 import com.bellego.domain.dto.system.StoreUpsertRequest;
-import com.bellego.domain.entity.Store;
+import com.bellego.domain.vo.StoreVo;
 import com.bellego.service.StoreService;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -16,28 +17,29 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/v1/stores")
 public class StoreController {
-
     private final StoreService storeService;
+    private final VoMapper voMapper;
 
-    public StoreController(StoreService storeService) {
+    public StoreController(StoreService storeService, VoMapper voMapper) {
         this.storeService = storeService;
+        this.voMapper = voMapper;
     }
 
     @GetMapping
     @PreAuthorize("hasAuthority('store:view')")
-    public Result<PageResult<Store>> page(StoreQueryRequest request) {
-        return ResultBuilder.success(storeService.page(request));
+    public Result<PageResult<StoreVo>> page(StoreQueryRequest request) {
+        return ResultBuilder.success(storeService.page(request).map(voMapper::toStoreVo));
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority('store:view')")
-    public Result<Store> get(@PathVariable String id) {
-        return ResultBuilder.success(storeService.getById(id));
+    public Result<StoreVo> get(@PathVariable String id) {
+        return ResultBuilder.success(voMapper.toStoreVo(storeService.getById(id)));
     }
 
     @PostMapping
     @PreAuthorize("hasAuthority('store:add')")
-    @LogOperation(module = "门店管理", action = "新增门店")
+    @LogOperation(module = "store", action = "create store")
     public Result<Void> create(@Valid @RequestBody StoreUpsertRequest request) {
         storeService.create(request);
         return ResultBuilder.success();
@@ -45,7 +47,7 @@ public class StoreController {
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAuthority('store:edit')")
-    @LogOperation(module = "门店管理", action = "修改门店")
+    @LogOperation(module = "store", action = "update store")
     public Result<Void> update(@PathVariable String id, @Valid @RequestBody StoreUpsertRequest request) {
         storeService.update(id, request);
         return ResultBuilder.success();
@@ -53,7 +55,7 @@ public class StoreController {
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('store:delete')")
-    @LogOperation(module = "门店管理", action = "删除门店")
+    @LogOperation(module = "store", action = "delete store")
     public Result<Void> delete(@PathVariable String id) {
         storeService.delete(id);
         return ResultBuilder.success();
@@ -61,10 +63,9 @@ public class StoreController {
 
     @PutMapping("/{id}/status")
     @PreAuthorize("hasAuthority('store:edit')")
-    @LogOperation(module = "门店管理", action = "修改门店状态")
+    @LogOperation(module = "store", action = "update store status")
     public Result<Void> updateStatus(@PathVariable String id, @Valid @RequestBody StatusUpdateRequest request) {
         storeService.updateStatus(id, request.getStatus());
         return ResultBuilder.success();
     }
 }
-

@@ -3,9 +3,10 @@ package com.bellego.controller;
 import com.bellego.aop.LogOperation;
 import com.bellego.common.result.Result;
 import com.bellego.common.result.ResultBuilder;
+import com.bellego.common.util.VoMapper;
 import com.bellego.domain.dto.common.StatusUpdateRequest;
 import com.bellego.domain.dto.member.MemberLevelUpsertRequest;
-import com.bellego.domain.entity.MemberLevel;
+import com.bellego.domain.vo.MemberLevelVo;
 import com.bellego.service.MemberLevelService;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -18,26 +19,28 @@ import java.util.List;
 public class MemberLevelController {
 
     private final MemberLevelService memberLevelService;
+    private final VoMapper voMapper;
 
-    public MemberLevelController(MemberLevelService memberLevelService) {
+    public MemberLevelController(MemberLevelService memberLevelService, VoMapper voMapper) {
         this.memberLevelService = memberLevelService;
+        this.voMapper = voMapper;
     }
 
     @GetMapping
     @PreAuthorize("hasAuthority('level:view')")
-    public Result<List<MemberLevel>> list() {
-        return ResultBuilder.success(memberLevelService.list());
+    public Result<List<MemberLevelVo>> list() {
+        return ResultBuilder.success(memberLevelService.list().stream().map(voMapper::toMemberLevelVo).toList());
     }
 
     @GetMapping("/{id}")
     @PreAuthorize("hasAuthority('level:view')")
-    public Result<MemberLevel> get(@PathVariable String id) {
-        return ResultBuilder.success(memberLevelService.getById(id));
+    public Result<MemberLevelVo> get(@PathVariable String id) {
+        return ResultBuilder.success(voMapper.toMemberLevelVo(memberLevelService.getById(id)));
     }
 
     @PostMapping
     @PreAuthorize("hasAuthority('level:add')")
-    @LogOperation(module = "会员等级", action = "新增等级")
+    @LogOperation(module = "level", action = "create level")
     public Result<Void> create(@Valid @RequestBody MemberLevelUpsertRequest request) {
         memberLevelService.create(request);
         return ResultBuilder.success();
@@ -45,7 +48,7 @@ public class MemberLevelController {
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAuthority('level:edit')")
-    @LogOperation(module = "会员等级", action = "修改等级")
+    @LogOperation(module = "level", action = "update level")
     public Result<Void> update(@PathVariable String id, @Valid @RequestBody MemberLevelUpsertRequest request) {
         memberLevelService.update(id, request);
         return ResultBuilder.success();
@@ -53,7 +56,7 @@ public class MemberLevelController {
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('level:delete')")
-    @LogOperation(module = "会员等级", action = "删除等级")
+    @LogOperation(module = "level", action = "delete level")
     public Result<Void> delete(@PathVariable String id) {
         memberLevelService.delete(id);
         return ResultBuilder.success();
@@ -61,10 +64,9 @@ public class MemberLevelController {
 
     @PutMapping("/{id}/status")
     @PreAuthorize("hasAuthority('level:edit')")
-    @LogOperation(module = "会员等级", action = "修改等级状态")
+    @LogOperation(module = "level", action = "update level status")
     public Result<Void> updateStatus(@PathVariable String id, @Valid @RequestBody StatusUpdateRequest request) {
         memberLevelService.updateStatus(id, request.getStatus());
         return ResultBuilder.success();
     }
 }
-
