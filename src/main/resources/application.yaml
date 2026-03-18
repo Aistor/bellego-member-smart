@@ -11,10 +11,17 @@ spring:
   jackson:
     time-zone: Asia/Shanghai
     date-format: yyyy-MM-dd HH:mm:ss
+logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %highlight(%-5level) %magenta([%thread]) %cyan(%logger{36}) - %msg%n"
+  level:
+    com.bellego: DEBUG
+    com.bellego.mapper: DEBUG
+    org.springframework: INFO
 mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true
-    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+    log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
 bellego:
   jwt:
     secret: bellego-member-smart-jwt-secret-key-2026-demo
