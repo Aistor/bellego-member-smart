@@ -3,7 +3,7 @@ package com.bellego.controller;
 import com.bellego.aop.LogOperation;
 import com.bellego.common.result.Result;
 import com.bellego.common.result.ResultBuilder;
-import com.bellego.domain.dto.system.PermissionUpsertRequest;
+import com.bellego.domain.dto.system.PermissionUpsertDto;
 import com.bellego.domain.vo.PermissionTreeNode;
 import com.bellego.service.PermissionService;
 import jakarta.validation.Valid;
@@ -15,7 +15,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/permissions")
 public class PermissionController {
-
     private final PermissionService permissionService;
 
     public PermissionController(PermissionService permissionService) {
@@ -30,26 +29,25 @@ public class PermissionController {
 
     @PostMapping
     @PreAuthorize("hasAuthority('permission:add')")
-    @LogOperation(module = "权限管理", action = "新增权限")
-    public Result<Void> create(@Valid @RequestBody PermissionUpsertRequest request) {
-        permissionService.create(request);
+    @LogOperation(module = "permission", action = "create permission")
+    public Result<Void> create(@Valid @RequestBody PermissionUpsertDto dto) {
+        permissionService.create(dto);
         return ResultBuilder.success();
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAuthority('permission:edit')")
-    @LogOperation(module = "权限管理", action = "修改权限")
-    public Result<Void> update(@PathVariable String id, @Valid @RequestBody PermissionUpsertRequest request) {
-        permissionService.update(id, request);
+    @LogOperation(module = "permission", action = "update permission")
+    public Result<Void> update(@PathVariable String id, @Valid @RequestBody PermissionUpsertDto dto) {
+        permissionService.update(id, dto);
         return ResultBuilder.success();
     }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('permission:delete')")
-    @LogOperation(module = "权限管理", action = "删除权限")
+    @LogOperation(module = "permission", action = "delete permission")
     public Result<Void> delete(@PathVariable String id) {
         permissionService.delete(id);
         return ResultBuilder.success();
     }
 }
-

@@ -6,8 +6,7 @@ import lombok.Data;
 import java.util.List;
 
 @Data
-public class AdminRoleAssignRequest {
+public class AdminRoleAssignDto {
     @NotEmpty(message = "角色不能为空")
     private List<String> roleIds;
 }
-

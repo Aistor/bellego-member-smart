@@ -1,14 +1,15 @@
 package com.bellego.controller;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.bellego.aop.LogOperation;
-import com.bellego.common.result.PageResult;
 import com.bellego.common.result.Result;
 import com.bellego.common.result.ResultBuilder;
+import com.bellego.common.util.PageConvertUtils;
 import com.bellego.common.util.VoMapper;
-import com.bellego.domain.dto.common.StatusUpdateRequest;
-import com.bellego.domain.dto.marketing.CouponIssueRequest;
-import com.bellego.domain.dto.marketing.CouponQueryRequest;
-import com.bellego.domain.dto.marketing.CouponUpsertRequest;
+import com.bellego.domain.dto.common.StatusUpdateDto;
+import com.bellego.domain.dto.marketing.CouponIssueDto;
+import com.bellego.domain.dto.marketing.CouponQueryDto;
+import com.bellego.domain.dto.marketing.CouponUpsertDto;
 import com.bellego.domain.vo.CouponVo;
 import com.bellego.service.CouponService;
 import jakarta.validation.Valid;
@@ -28,8 +29,8 @@ public class CouponController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('coupon:view')")
-    public Result<PageResult<CouponVo>> page(CouponQueryRequest request) {
-        return ResultBuilder.success(couponService.page(request).map(voMapper::toCouponVo));
+    public Result<IPage<CouponVo>> page(CouponQueryDto dto) {
+        return ResultBuilder.success(PageConvertUtils.map(couponService.page(dto), voMapper::toCouponVo));
     }
 
     @GetMapping("/{id}")
@@ -41,16 +42,16 @@ public class CouponController {
     @PostMapping
     @PreAuthorize("hasAuthority('coupon:add')")
     @LogOperation(module = "coupon", action = "create coupon")
-    public Result<Void> create(@Valid @RequestBody CouponUpsertRequest request) {
-        couponService.create(request);
+    public Result<Void> create(@Valid @RequestBody CouponUpsertDto dto) {
+        couponService.create(dto);
         return ResultBuilder.success();
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAuthority('coupon:edit')")
     @LogOperation(module = "coupon", action = "update coupon")
-    public Result<Void> update(@PathVariable String id, @Valid @RequestBody CouponUpsertRequest request) {
-        couponService.update(id, request);
+    public Result<Void> update(@PathVariable String id, @Valid @RequestBody CouponUpsertDto dto) {
+        couponService.update(id, dto);
         return ResultBuilder.success();
     }
 
@@ -65,16 +66,16 @@ public class CouponController {
     @PutMapping("/{id}/status")
     @PreAuthorize("hasAuthority('coupon:edit')")
     @LogOperation(module = "coupon", action = "update coupon status")
-    public Result<Void> updateStatus(@PathVariable String id, @Valid @RequestBody StatusUpdateRequest request) {
-        couponService.updateStatus(id, request.getStatus());
+    public Result<Void> updateStatus(@PathVariable String id, @Valid @RequestBody StatusUpdateDto dto) {
+        couponService.updateStatus(id, dto.getStatus());
         return ResultBuilder.success();
     }
 
     @PostMapping("/{id}/issue")
     @PreAuthorize("hasAuthority('coupon:issue')")
     @LogOperation(module = "coupon", action = "issue coupon")
-    public Result<Void> issue(@PathVariable String id, @RequestBody CouponIssueRequest request) {
-        couponService.issue(id, request);
+    public Result<Void> issue(@PathVariable String id, @RequestBody CouponIssueDto dto) {
+        couponService.issue(id, dto);
         return ResultBuilder.success();
     }
 }

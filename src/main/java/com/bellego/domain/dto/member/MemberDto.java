@@ -1,13 +1,16 @@
-package com.bellego.domain.vo;
+package com.bellego.domain.dto.member;
 
+import com.bellego.common.Pagination;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Data
-public class MemberVo {
+@EqualsAndHashCode(callSuper = true)
+public class MemberDto extends Pagination {
     private String id;
     private String levelId;
     private String cardNumber;

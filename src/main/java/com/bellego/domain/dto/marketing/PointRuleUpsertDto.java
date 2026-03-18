@@ -7,7 +7,7 @@ import lombok.Data;
 import java.math.BigDecimal;
 
 @Data
-public class PointRuleUpsertRequest {
+public class PointRuleUpsertDto {
     @NotBlank(message = "规则名称不能为空")
     private String ruleName;
     @NotNull(message = "规则类型不能为空")
@@ -20,4 +20,3 @@ public class PointRuleUpsertRequest {
     @NotNull(message = "状态不能为空")
     private Integer status;
 }
-

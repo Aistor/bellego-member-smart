@@ -6,8 +6,7 @@ import lombok.EqualsAndHashCode;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
-public class AdminQueryRequest extends PageQuery {
-    private String keyword;
-    private Integer status;
+public class LogQueryDto extends PageQuery {
+    private String operatorName;
+    private String module;
 }
-

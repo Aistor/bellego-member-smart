@@ -5,7 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 @Data
-public class PermissionUpsertRequest {
+public class PermissionUpsertDto {
     @NotBlank(message = "权限名称不能为空")
     private String name;
     @NotBlank(message = "权限编码不能为空")
@@ -14,4 +14,3 @@ public class PermissionUpsertRequest {
     private Integer type;
     private String parentId;
 }
-

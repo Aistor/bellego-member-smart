@@ -9,7 +9,7 @@ import java.math.BigDecimal;
 import java.util.Date;
 
 @Data
-public class ConsumptionCreateRequest {
+public class ConsumptionCreateDto {
     @NotBlank(message = "会员ID不能为空")
     private String memberId;
     @NotBlank(message = "门店ID不能为空")
@@ -19,4 +19,3 @@ public class ConsumptionCreateRequest {
     private BigDecimal amount;
     private Date consumeTime;
 }
-

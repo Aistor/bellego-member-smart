@@ -1,11 +1,12 @@
 package com.bellego.controller;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.bellego.aop.LogOperation;
-import com.bellego.common.result.PageResult;
 import com.bellego.common.result.Result;
 import com.bellego.common.result.ResultBuilder;
+import com.bellego.common.util.PageConvertUtils;
 import com.bellego.common.util.VoMapper;
-import com.bellego.domain.dto.marketing.MemberCouponQueryRequest;
+import com.bellego.domain.dto.marketing.MemberCouponQueryDto;
 import com.bellego.domain.vo.MemberCouponVo;
 import com.bellego.service.MemberCouponService;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -24,8 +25,8 @@ public class MemberCouponController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('memberCoupon:view')")
-    public Result<PageResult<MemberCouponVo>> page(MemberCouponQueryRequest request) {
-        return ResultBuilder.success(memberCouponService.page(request).map(voMapper::toMemberCouponVo));
+    public Result<IPage<MemberCouponVo>> page(MemberCouponQueryDto dto) {
+        return ResultBuilder.success(PageConvertUtils.map(memberCouponService.page(dto), voMapper::toMemberCouponVo));
     }
 
     @PutMapping("/{id}/use")

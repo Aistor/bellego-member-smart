@@ -1,17 +1,16 @@
 package com.bellego.service;
 
-import com.bellego.common.result.PageResult;
-import com.bellego.domain.dto.member.MemberQueryRequest;
-import com.bellego.domain.dto.member.MemberUpsertRequest;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.bellego.domain.dto.member.MemberQueryDto;
+import com.bellego.domain.dto.member.MemberUpsertDto;
 import com.bellego.domain.entity.Member;
 import org.springframework.web.multipart.MultipartFile;
 
 public interface MemberService {
-    PageResult<Member> page(MemberQueryRequest request);
+    IPage<Member> page(MemberQueryDto dto);
     Member getById(String id);
-    void create(MemberUpsertRequest request);
-    void update(String id, MemberUpsertRequest request);
+    void create(MemberUpsertDto dto);
+    void update(String id, MemberUpsertDto dto);
     void updateStatus(String id, Integer status);
     void importCsv(MultipartFile file);
 }
-

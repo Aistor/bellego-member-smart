@@ -6,6 +6,7 @@ import com.bellego.domain.entity.MemberConsumption;
 import com.bellego.mapper.MemberConsumptionMapper;
 import com.bellego.mapper.MemberMapper;
 import com.bellego.service.AnalysisService;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -20,9 +21,12 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.stream.Collectors;
 
+/**
+ * 分析服务实现
+ */
+@Slf4j
 @Service
 public class AnalysisServiceImpl implements AnalysisService {
-
     private final MemberMapper memberMapper;
     private final MemberConsumptionMapper consumptionMapper;
 
@@ -33,45 +37,40 @@ public class AnalysisServiceImpl implements AnalysisService {
 
     @Override
     public Map<String, Object> rfm() {
+        log.info("开始执行RFM分析");
         List<Member> members = memberMapper.selectList(new LambdaQueryWrapper<>());
         List<MemberConsumption> consumptions = consumptionMapper.selectList(new LambdaQueryWrapper<>());
         Map<String, Long> frequencyMap = consumptions.stream().collect(Collectors.groupingBy(MemberConsumption::getMemberId, Collectors.counting()));
-        return Map.of(
-                "totalMembers", members.size(),
-                "segments", members.stream().map(member -> {
-                    Map<String, Object> item = new HashMap<>();
-                    long recency = member.getLastConsumeTime() == null ? 999 : ChronoUnit.DAYS.between(
-                            member.getLastConsumeTime().toInstant().atZone(ZoneId.systemDefault()).toLocalDate(), LocalDate.now());
-                    long frequency = frequencyMap.getOrDefault(member.getId(), 0L);
-                    BigDecimal monetary = member.getTotalConsumption() == null ? BigDecimal.ZERO : member.getTotalConsumption();
-                    item.put("memberId", member.getId());
-                    item.put("memberName", member.getName());
-                    item.put("recencyDays", recency);
-                    item.put("frequency", frequency);
-                    item.put("monetary", monetary);
-                    item.put("rLevel", scoreRecency(recency));
-                    item.put("fLevel", scoreFrequency(frequency));
-                    item.put("mLevel", scoreMonetary(monetary));
-                    return item;
-                }).toList());
+        return Map.of("totalMembers", members.size(), "segments", members.stream().map(member -> {
+            Map<String, Object> item = new HashMap<>();
+            long recency = member.getLastConsumeTime() == null ? 999 : ChronoUnit.DAYS.between(member.getLastConsumeTime().toInstant().atZone(ZoneId.systemDefault()).toLocalDate(), LocalDate.now());
+            long frequency = frequencyMap.getOrDefault(member.getId(), 0L);
+            BigDecimal monetary = member.getTotalConsumption() == null ? BigDecimal.ZERO : member.getTotalConsumption();
+            item.put("memberId", member.getId());
+            item.put("memberName", member.getName());
+            item.put("recencyDays", recency);
+            item.put("frequency", frequency);
+            item.put("monetary", monetary);
+            item.put("rLevel", scoreRecency(recency));
+            item.put("fLevel", scoreFrequency(frequency));
+            item.put("mLevel", scoreMonetary(monetary));
+            return item;
+        }).toList());
     }
 
     @Override
     public Map<String, Object> lifecycle(String period) {
+        log.info("开始执行会员生命周期分析，period={}", period);
         List<Member> members = memberMapper.selectList(new LambdaQueryWrapper<>());
-        Map<String, Long> newTrend = members.stream().filter(member -> member.getCreateTime() != null)
-                .collect(Collectors.groupingBy(member -> bucket(member.getCreateTime(), period), LinkedHashMap::new, Collectors.counting()));
+        Map<String, Long> newTrend = members.stream().filter(member -> member.getCreateTime() != null).collect(Collectors.groupingBy(member -> bucket(member.getCreateTime(), period), LinkedHashMap::new, Collectors.counting()));
         long active = members.stream().filter(member -> member.getLastConsumeTime() != null && daysBetween(member.getLastConsumeTime(), new Date()) <= 30).count();
         long lost = members.stream().filter(member -> member.getLastConsumeTime() == null || daysBetween(member.getLastConsumeTime(), new Date()) > 90).count();
-        return Map.of(
-                "newTrend", newTrend,
-                "activeCount", active,
-                "lostCount", lost,
-                "totalMembers", members.size());
+        return Map.of("newTrend", newTrend, "activeCount", active, "lostCount", lost, "totalMembers", members.size());
     }
 
     @Override
     public Map<String, Object> orderAmount() {
+        log.info("开始执行客单价分布分析");
         List<MemberConsumption> consumptions = consumptionMapper.selectList(new LambdaQueryWrapper<>());
         Map<String, Long> bucketCount = new LinkedHashMap<>();
         bucketCount.put("0-100", 0L);
@@ -80,21 +79,19 @@ public class AnalysisServiceImpl implements AnalysisService {
         bucketCount.put("500+", 0L);
         consumptions.forEach(item -> {
             BigDecimal amount = item.getAmount();
-            if (amount.compareTo(BigDecimal.valueOf(100)) <= 0) {
-                bucketCount.computeIfPresent("0-100", (k, v) -> v + 1);
-            } else if (amount.compareTo(BigDecimal.valueOf(300)) <= 0) {
+            if (amount.compareTo(BigDecimal.valueOf(100)) <= 0) bucketCount.computeIfPresent("0-100", (k, v) -> v + 1);
+            else if (amount.compareTo(BigDecimal.valueOf(300)) <= 0)
                 bucketCount.computeIfPresent("101-300", (k, v) -> v + 1);
-            } else if (amount.compareTo(BigDecimal.valueOf(500)) <= 0) {
+            else if (amount.compareTo(BigDecimal.valueOf(500)) <= 0)
                 bucketCount.computeIfPresent("301-500", (k, v) -> v + 1);
-            } else {
-                bucketCount.computeIfPresent("500+", (k, v) -> v + 1);
-            }
+            else bucketCount.computeIfPresent("500+", (k, v) -> v + 1);
         });
         return Map.of("buckets", bucketCount, "totalOrders", consumptions.size());
     }
 
     @Override
     public Map<String, Object> repurchase() {
+        log.info("开始执行复购率分析");
         List<MemberConsumption> consumptions = consumptionMapper.selectList(new LambdaQueryWrapper<>());
         Map<String, Long> countByMember = consumptions.stream().collect(Collectors.groupingBy(MemberConsumption::getMemberId, Collectors.counting()));
         long repurchaseMembers = countByMember.values().stream().filter(count -> count >= 2).count();
@@ -105,10 +102,9 @@ public class AnalysisServiceImpl implements AnalysisService {
 
     @Override
     public Map<String, Object> timeDistribution() {
+        log.info("开始执行消费时段分析");
         List<MemberConsumption> consumptions = consumptionMapper.selectList(new LambdaQueryWrapper<>());
-        Map<Integer, Long> distribution = consumptions.stream()
-                .filter(item -> item.getConsumeTime() != null)
-                .collect(Collectors.groupingBy(item -> item.getConsumeTime().toInstant().atZone(ZoneId.systemDefault()).getHour(), TreeMap::new, Collectors.counting()));
+        Map<Integer, Long> distribution = consumptions.stream().filter(item -> item.getConsumeTime() != null).collect(Collectors.groupingBy(item -> item.getConsumeTime().toInstant().atZone(ZoneId.systemDefault()).getHour(), TreeMap::new, Collectors.counting()));
         return Map.of("distribution", distribution);
     }
 
@@ -137,17 +133,13 @@ public class AnalysisServiceImpl implements AnalysisService {
     }
 
     private long daysBetween(Date start, Date end) {
-        return ChronoUnit.DAYS.between(
-                start.toInstant().atZone(ZoneId.systemDefault()).toLocalDate(),
-                end.toInstant().atZone(ZoneId.systemDefault()).toLocalDate());
+        return ChronoUnit.DAYS.between(start.toInstant().atZone(ZoneId.systemDefault()).toLocalDate(), end.toInstant().atZone(ZoneId.systemDefault()).toLocalDate());
     }
 
     private String bucket(Date date, String period) {
         LocalDate localDate = date.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
-        if ("MONTH".equalsIgnoreCase(period)) {
+        if ("MONTH".equalsIgnoreCase(period))
             return localDate.getYear() + "-" + String.format("%02d", localDate.getMonthValue());
-        }
         return localDate.toString();
     }
 }
-

@@ -5,8 +5,7 @@ import lombok.Data;
 import java.util.List;
 
 @Data
-public class CouponIssueRequest {
+public class CouponIssueDto {
     private Boolean issueAll = false;
     private List<String> memberIds;
 }
-

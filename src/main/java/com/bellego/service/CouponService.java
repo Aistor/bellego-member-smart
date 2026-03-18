@@ -1,18 +1,17 @@
 package com.bellego.service;
 
-import com.bellego.common.result.PageResult;
-import com.bellego.domain.dto.marketing.CouponIssueRequest;
-import com.bellego.domain.dto.marketing.CouponQueryRequest;
-import com.bellego.domain.dto.marketing.CouponUpsertRequest;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.bellego.domain.dto.marketing.CouponIssueDto;
+import com.bellego.domain.dto.marketing.CouponQueryDto;
+import com.bellego.domain.dto.marketing.CouponUpsertDto;
 import com.bellego.domain.entity.Coupon;
 
 public interface CouponService {
-    PageResult<Coupon> page(CouponQueryRequest request);
+    IPage<Coupon> page(CouponQueryDto dto);
     Coupon getById(String id);
-    void create(CouponUpsertRequest request);
-    void update(String id, CouponUpsertRequest request);
+    void create(CouponUpsertDto dto);
+    void update(String id, CouponUpsertDto dto);
     void delete(String id);
     void updateStatus(String id, Integer status);
-    void issue(String id, CouponIssueRequest request);
+    void issue(String id, CouponIssueDto dto);
 }
-

@@ -45,4 +45,3 @@ public class CsvImportUtils {
         return parts.length > 0 && parts[0].matches("[A-Za-z_\u4e00-\u9fa5]+.*");
     }
 }
-

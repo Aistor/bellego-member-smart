@@ -6,7 +6,6 @@ import lombok.EqualsAndHashCode;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
-public class RoleQueryRequest extends PageQuery {
+public class RoleQueryDto extends PageQuery {
     private String keyword;
 }
-

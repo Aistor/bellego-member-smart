@@ -1,10 +1,11 @@
 package com.bellego.controller;
 
-import com.bellego.common.result.PageResult;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.bellego.common.result.Result;
 import com.bellego.common.result.ResultBuilder;
+import com.bellego.common.util.PageConvertUtils;
 import com.bellego.common.util.VoMapper;
-import com.bellego.domain.dto.system.LogQueryRequest;
+import com.bellego.domain.dto.system.LogQueryDto;
 import com.bellego.domain.vo.OperationLogVo;
 import com.bellego.service.OperationLogService;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -23,8 +24,8 @@ public class LogController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('log:view')")
-    public Result<PageResult<OperationLogVo>> page(LogQueryRequest request) {
-        return ResultBuilder.success(operationLogService.page(request).map(voMapper::toOperationLogVo));
+    public Result<IPage<OperationLogVo>> page(LogQueryDto dto) {
+        return ResultBuilder.success(PageConvertUtils.map(operationLogService.page(dto), voMapper::toOperationLogVo));
     }
 
     @GetMapping("/{id}")

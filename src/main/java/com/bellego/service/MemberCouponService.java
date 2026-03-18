@@ -1,11 +1,10 @@
 package com.bellego.service;
 
-import com.bellego.common.result.PageResult;
-import com.bellego.domain.dto.marketing.MemberCouponQueryRequest;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.bellego.domain.dto.marketing.MemberCouponQueryDto;
 import com.bellego.domain.entity.MemberCoupon;
 
 public interface MemberCouponService {
-    PageResult<MemberCoupon> page(MemberCouponQueryRequest request);
+    IPage<MemberCoupon> page(MemberCouponQueryDto dto);
     void useCoupon(String id);
 }
-

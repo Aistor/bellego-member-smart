@@ -1,14 +1,15 @@
 package com.bellego.controller;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.bellego.aop.LogOperation;
-import com.bellego.common.result.PageResult;
 import com.bellego.common.result.Result;
 import com.bellego.common.result.ResultBuilder;
+import com.bellego.common.util.PageConvertUtils;
 import com.bellego.common.util.VoMapper;
-import com.bellego.domain.dto.common.StatusUpdateRequest;
-import com.bellego.domain.dto.system.AdminQueryRequest;
-import com.bellego.domain.dto.system.AdminRoleAssignRequest;
-import com.bellego.domain.dto.system.AdminUpsertRequest;
+import com.bellego.domain.dto.common.StatusUpdateDto;
+import com.bellego.domain.dto.system.AdminQueryDto;
+import com.bellego.domain.dto.system.AdminRoleAssignDto;
+import com.bellego.domain.dto.system.AdminUpsertDto;
 import com.bellego.domain.vo.AdminVo;
 import com.bellego.service.AdminService;
 import jakarta.validation.Valid;
@@ -28,23 +29,23 @@ public class AdminController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('admin:view')")
-    public Result<PageResult<AdminVo>> page(AdminQueryRequest request) {
-        return ResultBuilder.success(adminService.page(request).map(voMapper::toAdminVo));
+    public Result<IPage<AdminVo>> page(AdminQueryDto dto) {
+        return ResultBuilder.success(PageConvertUtils.map(adminService.page(dto), voMapper::toAdminVo));
     }
 
     @PostMapping
     @PreAuthorize("hasAuthority('admin:add')")
     @LogOperation(module = "admin", action = "create admin")
-    public Result<Void> create(@Valid @RequestBody AdminUpsertRequest request) {
-        adminService.create(request);
+    public Result<Void> create(@Valid @RequestBody AdminUpsertDto dto) {
+        adminService.create(dto);
         return ResultBuilder.success();
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAuthority('admin:edit')")
     @LogOperation(module = "admin", action = "update admin")
-    public Result<Void> update(@PathVariable String id, @Valid @RequestBody AdminUpsertRequest request) {
-        adminService.update(id, request);
+    public Result<Void> update(@PathVariable String id, @Valid @RequestBody AdminUpsertDto dto) {
+        adminService.update(id, dto);
         return ResultBuilder.success();
     }
 
@@ -59,16 +60,16 @@ public class AdminController {
     @PutMapping("/{id}/status")
     @PreAuthorize("hasAuthority('admin:edit')")
     @LogOperation(module = "admin", action = "update admin status")
-    public Result<Void> updateStatus(@PathVariable String id, @Valid @RequestBody StatusUpdateRequest request) {
-        adminService.updateStatus(id, request.getStatus());
+    public Result<Void> updateStatus(@PathVariable String id, @Valid @RequestBody StatusUpdateDto dto) {
+        adminService.updateStatus(id, dto.getStatus());
         return ResultBuilder.success();
     }
 
     @PutMapping("/{id}/roles")
     @PreAuthorize("hasAuthority('admin:assign')")
     @LogOperation(module = "admin", action = "assign admin roles")
-    public Result<Void> assignRoles(@PathVariable String id, @Valid @RequestBody AdminRoleAssignRequest request) {
-        adminService.assignRoles(id, request);
+    public Result<Void> assignRoles(@PathVariable String id, @Valid @RequestBody AdminRoleAssignDto dto) {
+        adminService.assignRoles(id, dto);
         return ResultBuilder.success();
     }
 }

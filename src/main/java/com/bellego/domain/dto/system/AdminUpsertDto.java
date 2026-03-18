@@ -5,7 +5,7 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 @Data
-public class AdminUpsertRequest {
+public class AdminUpsertDto {
     @NotBlank(message = "用户名不能为空")
     private String username;
     private String password;
@@ -14,4 +14,3 @@ public class AdminUpsertRequest {
     @NotNull(message = "状态不能为空")
     private Integer status;
 }
-

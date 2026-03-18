@@ -1,13 +1,14 @@
 package com.bellego.controller;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.bellego.aop.LogOperation;
-import com.bellego.common.result.PageResult;
 import com.bellego.common.result.Result;
 import com.bellego.common.result.ResultBuilder;
+import com.bellego.common.util.PageConvertUtils;
 import com.bellego.common.util.VoMapper;
-import com.bellego.domain.dto.common.StatusUpdateRequest;
-import com.bellego.domain.dto.system.StoreQueryRequest;
-import com.bellego.domain.dto.system.StoreUpsertRequest;
+import com.bellego.domain.dto.common.StatusUpdateDto;
+import com.bellego.domain.dto.system.StoreQueryDto;
+import com.bellego.domain.dto.system.StoreUpsertDto;
 import com.bellego.domain.vo.StoreVo;
 import com.bellego.service.StoreService;
 import jakarta.validation.Valid;
@@ -27,8 +28,8 @@ public class StoreController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('store:view')")
-    public Result<PageResult<StoreVo>> page(StoreQueryRequest request) {
-        return ResultBuilder.success(storeService.page(request).map(voMapper::toStoreVo));
+    public Result<IPage<StoreVo>> page(StoreQueryDto dto) {
+        return ResultBuilder.success(PageConvertUtils.map(storeService.page(dto), voMapper::toStoreVo));
     }
 
     @GetMapping("/{id}")
@@ -40,16 +41,16 @@ public class StoreController {
     @PostMapping
     @PreAuthorize("hasAuthority('store:add')")
     @LogOperation(module = "store", action = "create store")
-    public Result<Void> create(@Valid @RequestBody StoreUpsertRequest request) {
-        storeService.create(request);
+    public Result<Void> create(@Valid @RequestBody StoreUpsertDto dto) {
+        storeService.create(dto);
         return ResultBuilder.success();
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAuthority('store:edit')")
     @LogOperation(module = "store", action = "update store")
-    public Result<Void> update(@PathVariable String id, @Valid @RequestBody StoreUpsertRequest request) {
-        storeService.update(id, request);
+    public Result<Void> update(@PathVariable String id, @Valid @RequestBody StoreUpsertDto dto) {
+        storeService.update(id, dto);
         return ResultBuilder.success();
     }
 
@@ -64,8 +65,8 @@ public class StoreController {
     @PutMapping("/{id}/status")
     @PreAuthorize("hasAuthority('store:edit')")
     @LogOperation(module = "store", action = "update store status")
-    public Result<Void> updateStatus(@PathVariable String id, @Valid @RequestBody StatusUpdateRequest request) {
-        storeService.updateStatus(id, request.getStatus());
+    public Result<Void> updateStatus(@PathVariable String id, @Valid @RequestBody StatusUpdateDto dto) {
+        storeService.updateStatus(id, dto.getStatus());
         return ResultBuilder.success();
     }
 }

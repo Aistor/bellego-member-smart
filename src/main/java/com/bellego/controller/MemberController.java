@@ -1,13 +1,14 @@
 package com.bellego.controller;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.bellego.aop.LogOperation;
-import com.bellego.common.result.PageResult;
 import com.bellego.common.result.Result;
 import com.bellego.common.result.ResultBuilder;
+import com.bellego.common.util.PageConvertUtils;
 import com.bellego.common.util.VoMapper;
-import com.bellego.domain.dto.common.StatusUpdateRequest;
-import com.bellego.domain.dto.member.MemberQueryRequest;
-import com.bellego.domain.dto.member.MemberUpsertRequest;
+import com.bellego.domain.dto.common.StatusUpdateDto;
+import com.bellego.domain.dto.member.MemberQueryDto;
+import com.bellego.domain.dto.member.MemberUpsertDto;
 import com.bellego.domain.vo.MemberVo;
 import com.bellego.service.MemberService;
 import jakarta.validation.Valid;
@@ -18,7 +19,6 @@ import org.springframework.web.multipart.MultipartFile;
 @RestController
 @RequestMapping("/api/v1/members")
 public class MemberController {
-
     private final MemberService memberService;
     private final VoMapper voMapper;
 
@@ -29,8 +29,8 @@ public class MemberController {
 
     @GetMapping
     @PreAuthorize("hasAuthority('member:view')")
-    public Result<PageResult<MemberVo>> page(MemberQueryRequest request) {
-        return ResultBuilder.success(memberService.page(request).map(voMapper::toMemberVo));
+    public Result<IPage<MemberVo>> page(MemberQueryDto dto) {
+        return ResultBuilder.success(PageConvertUtils.map(memberService.page(dto), voMapper::toMemberVo));
     }
 
     @GetMapping("/{id}")
@@ -42,24 +42,24 @@ public class MemberController {
     @PostMapping
     @PreAuthorize("hasAuthority('member:add')")
     @LogOperation(module = "member", action = "create member")
-    public Result<Void> create(@Valid @RequestBody MemberUpsertRequest request) {
-        memberService.create(request);
+    public Result<Void> create(@Valid @RequestBody MemberUpsertDto dto) {
+        memberService.create(dto);
         return ResultBuilder.success();
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAuthority('member:edit')")
     @LogOperation(module = "member", action = "update member")
-    public Result<Void> update(@PathVariable String id, @Valid @RequestBody MemberUpsertRequest request) {
-        memberService.update(id, request);
+    public Result<Void> update(@PathVariable String id, @Valid @RequestBody MemberUpsertDto dto) {
+        memberService.update(id, dto);
         return ResultBuilder.success();
     }
 
     @PutMapping("/{id}/status")
     @PreAuthorize("hasAuthority('member:edit')")
     @LogOperation(module = "member", action = "update member status")
-    public Result<Void> updateStatus(@PathVariable String id, @Valid @RequestBody StatusUpdateRequest request) {
-        memberService.updateStatus(id, request.getStatus());
+    public Result<Void> updateStatus(@PathVariable String id, @Valid @RequestBody StatusUpdateDto dto) {
+        memberService.updateStatus(id, dto.getStatus());
         return ResultBuilder.success();
     }
 

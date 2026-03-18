@@ -6,8 +6,7 @@ import lombok.Data;
 import java.util.List;
 
 @Data
-public class RolePermissionAssignRequest {
+public class RolePermissionAssignDto {
     @NotEmpty(message = "权限不能为空")
     private List<String> permissionIds;
 }
-

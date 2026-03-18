@@ -7,7 +7,7 @@ import lombok.Data;
 import java.math.BigDecimal;
 
 @Data
-public class MemberLevelUpsertRequest {
+public class MemberLevelUpsertDto {
     @NotBlank(message = "等级名称不能为空")
     private String name;
     @NotNull(message = "等级值不能为空")
@@ -23,4 +23,3 @@ public class MemberLevelUpsertRequest {
     @NotNull(message = "状态不能为空")
     private Integer status;
 }
-

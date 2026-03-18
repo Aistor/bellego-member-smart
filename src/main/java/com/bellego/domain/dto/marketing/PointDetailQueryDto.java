@@ -1,4 +1,4 @@
-package com.bellego.domain.dto.member;
+package com.bellego.domain.dto.marketing;
 
 import com.bellego.common.PageQuery;
 import lombok.Data;
@@ -6,8 +6,7 @@ import lombok.EqualsAndHashCode;
 
 @Data
 @EqualsAndHashCode(callSuper = true)
-public class ConsumptionQueryRequest extends PageQuery {
+public class PointDetailQueryDto extends PageQuery {
     private String memberId;
-    private String storeId;
+    private Integer type;
 }
-

@@ -1,13 +1,14 @@
 package com.bellego.controller;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.bellego.aop.LogOperation;
-import com.bellego.common.result.PageResult;
 import com.bellego.common.result.Result;
 import com.bellego.common.result.ResultBuilder;
+import com.bellego.common.util.PageConvertUtils;
 import com.bellego.common.util.VoMapper;
-import com.bellego.domain.dto.common.StatusUpdateRequest;
-import com.bellego.domain.dto.marketing.PointDetailQueryRequest;
-import com.bellego.domain.dto.marketing.PointRuleUpsertRequest;
+import com.bellego.domain.dto.common.StatusUpdateDto;
+import com.bellego.domain.dto.marketing.PointDetailQueryDto;
+import com.bellego.domain.dto.marketing.PointRuleUpsertDto;
 import com.bellego.domain.vo.PointDetailVo;
 import com.bellego.domain.vo.PointRuleVo;
 import com.bellego.service.PointDetailService;
@@ -40,16 +41,16 @@ public class PointController {
     @PostMapping("/api/v1/point-rules")
     @PreAuthorize("hasAuthority('pointRule:add')")
     @LogOperation(module = "pointRule", action = "create point rule")
-    public Result<Void> createRule(@Valid @RequestBody PointRuleUpsertRequest request) {
-        pointRuleService.create(request);
+    public Result<Void> createRule(@Valid @RequestBody PointRuleUpsertDto dto) {
+        pointRuleService.create(dto);
         return ResultBuilder.success();
     }
 
     @PutMapping("/api/v1/point-rules/{id}")
     @PreAuthorize("hasAuthority('pointRule:edit')")
     @LogOperation(module = "pointRule", action = "update point rule")
-    public Result<Void> updateRule(@PathVariable String id, @Valid @RequestBody PointRuleUpsertRequest request) {
-        pointRuleService.update(id, request);
+    public Result<Void> updateRule(@PathVariable String id, @Valid @RequestBody PointRuleUpsertDto dto) {
+        pointRuleService.update(id, dto);
         return ResultBuilder.success();
     }
 
@@ -64,15 +65,15 @@ public class PointController {
     @PutMapping("/api/v1/point-rules/{id}/status")
     @PreAuthorize("hasAuthority('pointRule:edit')")
     @LogOperation(module = "pointRule", action = "update point rule status")
-    public Result<Void> updateRuleStatus(@PathVariable String id, @Valid @RequestBody StatusUpdateRequest request) {
-        pointRuleService.updateStatus(id, request.getStatus());
+    public Result<Void> updateRuleStatus(@PathVariable String id, @Valid @RequestBody StatusUpdateDto dto) {
+        pointRuleService.updateStatus(id, dto.getStatus());
         return ResultBuilder.success();
     }
 
     @GetMapping("/api/v1/point-details")
     @PreAuthorize("hasAuthority('pointDetail:view')")
-    public Result<PageResult<PointDetailVo>> pageDetails(PointDetailQueryRequest request) {
-        return ResultBuilder.success(pointDetailService.page(request).map(voMapper::toPointDetailVo));
+    public Result<IPage<PointDetailVo>> pageDetails(PointDetailQueryDto dto) {
+        return ResultBuilder.success(PageConvertUtils.map(pointDetailService.page(dto), voMapper::toPointDetailVo));
     }
 
     @PostMapping("/api/v1/point-details/import")

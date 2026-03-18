@@ -1,12 +1,12 @@
 package com.bellego.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.bellego.common.exception.BusinessException;
-import com.bellego.common.result.PageResult;
-import com.bellego.domain.dto.marketing.CouponIssueRequest;
-import com.bellego.domain.dto.marketing.CouponQueryRequest;
-import com.bellego.domain.dto.marketing.CouponUpsertRequest;
+import com.bellego.domain.dto.marketing.CouponIssueDto;
+import com.bellego.domain.dto.marketing.CouponQueryDto;
+import com.bellego.domain.dto.marketing.CouponUpsertDto;
 import com.bellego.domain.entity.Coupon;
 import com.bellego.domain.entity.Member;
 import com.bellego.domain.entity.MemberCoupon;
@@ -22,6 +22,9 @@ import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * 优惠券服务实现
+ */
 @Slf4j
 @Service
 public class CouponServiceImpl implements CouponService {
@@ -36,46 +39,53 @@ public class CouponServiceImpl implements CouponService {
     }
 
     @Override
-    public PageResult<Coupon> page(CouponQueryRequest request) {
-        LambdaQueryWrapper<Coupon> wrapper = new LambdaQueryWrapper<Coupon>().eq(request.getStatus() != null, Coupon::getStatus, request.getStatus()).and(request.getKeyword() != null && !request.getKeyword().isBlank(), q -> q.like(Coupon::getName, request.getKeyword())).orderByDesc(Coupon::getCreateTime);
-        return PageResult.of(couponMapper.selectPage(new Page<>(request.getPageNum(), request.getPageSize()), wrapper));
+    public IPage<Coupon> page(CouponQueryDto dto) {
+        log.info("开始分页查询优惠券，关键字={}, 状态={}", dto.getKeyword(), dto.getStatus());
+        LambdaQueryWrapper<Coupon> wrapper = new LambdaQueryWrapper<Coupon>()
+                .eq(dto.getStatus() != null, Coupon::getStatus, dto.getStatus())
+                .and(dto.getKeyword() != null && !dto.getKeyword().isBlank(), q -> q.like(Coupon::getName, dto.getKeyword()))
+                .orderByDesc(Coupon::getCreateTime);
+        return couponMapper.selectPage(new Page<>(dto.getPageNum(), dto.getPageSize()), wrapper);
     }
 
     @Override
     public Coupon getById(String id) {
         Coupon coupon = couponMapper.selectById(id);
-        if (coupon == null) throw new BusinessException("Coupon not found");
+        if (coupon == null) {
+            log.error("查询优惠券失败，优惠券不存在，id={}", id);
+            throw new BusinessException("优惠券不存在");
+        }
         return coupon;
     }
 
     @Override
-    public void create(CouponUpsertRequest request) {
-        log.info("Creating coupon, name={}", request.getName());
+    public void create(CouponUpsertDto dto) {
+        log.info("开始新增优惠券，名称={}", dto.getName());
         Coupon coupon = new Coupon();
-        copy(request, coupon);
+        copy(dto, coupon);
         coupon.setTotalIssued(0);
         coupon.setCreateTime(new Date());
         couponMapper.insert(coupon);
     }
 
     @Override
-    public void update(String id, CouponUpsertRequest request) {
-        log.info("Updating coupon, id={}", id);
+    public void update(String id, CouponUpsertDto dto) {
+        log.info("开始修改优惠券，id={}", id);
         Coupon coupon = getById(id);
-        copy(request, coupon);
+        copy(dto, coupon);
         couponMapper.updateById(coupon);
     }
 
     @Override
     public void delete(String id) {
-        log.info("Deleting coupon, id={}", id);
+        log.info("开始删除优惠券，id={}", id);
         getById(id);
         couponMapper.deleteById(id);
     }
 
     @Override
     public void updateStatus(String id, Integer status) {
-        log.info("Updating coupon status, id={}, status={}", id, status);
+        log.info("开始修改优惠券状态，id={}, status={}", id, status);
         Coupon coupon = getById(id);
         coupon.setStatus(status);
         couponMapper.updateById(coupon);
@@ -83,12 +93,20 @@ public class CouponServiceImpl implements CouponService {
 
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void issue(String id, CouponIssueRequest request) {
+    public void issue(String id, CouponIssueDto dto) {
         Coupon coupon = getById(id);
-        List<String> memberIds = Boolean.TRUE.equals(request.getIssueAll()) ? memberMapper.selectList(new LambdaQueryWrapper<Member>().eq(Member::getStatus, 1)).stream().map(Member::getId).toList() : request.getMemberIds();
-        if (memberIds == null || memberIds.isEmpty()) throw new BusinessException("Member list is empty");
-        if (coupon.getStock() < memberIds.size()) throw new BusinessException("Coupon stock is insufficient");
-        log.info("Issuing coupon, couponId={}, receiverCount={}", id, memberIds.size());
+        List<String> memberIds = Boolean.TRUE.equals(dto.getIssueAll())
+                ? memberMapper.selectList(new LambdaQueryWrapper<Member>().eq(Member::getStatus, 1)).stream().map(Member::getId).toList()
+                : dto.getMemberIds();
+        if (memberIds == null || memberIds.isEmpty()) {
+            log.error("发放优惠券失败，会员列表为空，couponId={}", id);
+            throw new BusinessException("请选择发放会员");
+        }
+        if (coupon.getStock() < memberIds.size()) {
+            log.error("发放优惠券失败，库存不足，couponId={}, stock={}, need={}", id, coupon.getStock(), memberIds.size());
+            throw new BusinessException("优惠券库存不足");
+        }
+        log.info("开始发放优惠券，couponId={}, memberCount={}", id, memberIds.size());
         Date now = new Date();
         for (String memberId : memberIds) {
             MemberCoupon memberCoupon = new MemberCoupon();
@@ -105,14 +123,14 @@ public class CouponServiceImpl implements CouponService {
         couponMapper.updateById(coupon);
     }
 
-    private void copy(CouponUpsertRequest request, Coupon coupon) {
-        coupon.setName(request.getName());
-        coupon.setType(request.getType());
-        coupon.setCouponValue(request.getCouponValue());
-        coupon.setUseCondition(request.getUseCondition());
-        coupon.setStock(request.getStock());
-        coupon.setStartTime(request.getStartTime());
-        coupon.setEndTime(request.getEndTime());
-        coupon.setStatus(request.getStatus());
+    private void copy(CouponUpsertDto dto, Coupon coupon) {
+        coupon.setName(dto.getName());
+        coupon.setType(dto.getType());
+        coupon.setCouponValue(dto.getCouponValue());
+        coupon.setUseCondition(dto.getUseCondition());
+        coupon.setStock(dto.getStock());
+        coupon.setStartTime(dto.getStartTime());
+        coupon.setEndTime(dto.getEndTime());
+        coupon.setStatus(dto.getStatus());
     }
 }

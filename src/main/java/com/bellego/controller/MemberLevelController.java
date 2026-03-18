@@ -4,8 +4,8 @@ import com.bellego.aop.LogOperation;
 import com.bellego.common.result.Result;
 import com.bellego.common.result.ResultBuilder;
 import com.bellego.common.util.VoMapper;
-import com.bellego.domain.dto.common.StatusUpdateRequest;
-import com.bellego.domain.dto.member.MemberLevelUpsertRequest;
+import com.bellego.domain.dto.common.StatusUpdateDto;
+import com.bellego.domain.dto.member.MemberLevelUpsertDto;
 import com.bellego.domain.vo.MemberLevelVo;
 import com.bellego.service.MemberLevelService;
 import jakarta.validation.Valid;
@@ -17,7 +17,6 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/levels")
 public class MemberLevelController {
-
     private final MemberLevelService memberLevelService;
     private final VoMapper voMapper;
 
@@ -41,16 +40,16 @@ public class MemberLevelController {
     @PostMapping
     @PreAuthorize("hasAuthority('level:add')")
     @LogOperation(module = "level", action = "create level")
-    public Result<Void> create(@Valid @RequestBody MemberLevelUpsertRequest request) {
-        memberLevelService.create(request);
+    public Result<Void> create(@Valid @RequestBody MemberLevelUpsertDto dto) {
+        memberLevelService.create(dto);
         return ResultBuilder.success();
     }
 
     @PutMapping("/{id}")
     @PreAuthorize("hasAuthority('level:edit')")
     @LogOperation(module = "level", action = "update level")
-    public Result<Void> update(@PathVariable String id, @Valid @RequestBody MemberLevelUpsertRequest request) {
-        memberLevelService.update(id, request);
+    public Result<Void> update(@PathVariable String id, @Valid @RequestBody MemberLevelUpsertDto dto) {
+        memberLevelService.update(id, dto);
         return ResultBuilder.success();
     }
 
@@ -65,8 +64,8 @@ public class MemberLevelController {
     @PutMapping("/{id}/status")
     @PreAuthorize("hasAuthority('level:edit')")
     @LogOperation(module = "level", action = "update level status")
-    public Result<Void> updateStatus(@PathVariable String id, @Valid @RequestBody StatusUpdateRequest request) {
-        memberLevelService.updateStatus(id, request.getStatus());
+    public Result<Void> updateStatus(@PathVariable String id, @Valid @RequestBody StatusUpdateDto dto) {
+        memberLevelService.updateStatus(id, dto.getStatus());
         return ResultBuilder.success();
     }
 }

@@ -8,10 +8,10 @@ import java.math.BigDecimal;
 import java.util.Date;
 
 @Data
-public class CouponUpsertRequest {
+public class CouponUpsertDto {
     @NotBlank(message = "优惠券名称不能为空")
     private String name;
-    @NotNull(message = "类型不能为空")
+    @NotNull(message = "优惠券类型不能为空")
     private Integer type;
     @NotNull(message = "优惠值不能为空")
     private BigDecimal couponValue;
@@ -25,4 +25,3 @@ public class CouponUpsertRequest {
     @NotNull(message = "状态不能为空")
     private Integer status;
 }
-
