@@ -23,16 +23,16 @@ public class SecurityConfig {
                                                    RestAuthenticationEntryPoint authenticationEntryPoint,
                                                    RestAccessDeniedHandler accessDeniedHandler) throws Exception {
         httpSecurity
-                .csrf(AbstractHttpConfigurer::disable)
-                .cors(Customizer.withDefaults())
+                .csrf(AbstractHttpConfigurer::disable) // 禁用 CSRF（JWT 不需要）
+                .cors(Customizer.withDefaults()) // 启用 CORS
                 .sessionManagement(configurer -> configurer.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(registry -> registry
-                        .requestMatchers("/api/v1/auth/login", "/error").permitAll()
-                        .anyRequest().authenticated())
+                        .requestMatchers("/api/v1/auth/login", "/error").permitAll()  // 放行登录接口
+                        .anyRequest().authenticated()) // 其他请求需要认证
                 .exceptionHandling(configurer -> configurer
-                        .authenticationEntryPoint(authenticationEntryPoint)
-                        .accessDeniedHandler(accessDeniedHandler))
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                        .authenticationEntryPoint(authenticationEntryPoint) // 认证失败处理
+                        .accessDeniedHandler(accessDeniedHandler)) // 权限不足处理
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class); // 添加 JWT 过滤器
         return httpSecurity.build();
     }
 }
