@@ -9,6 +9,7 @@ import com.bellego.common.util.VoMapper;
 import com.bellego.domain.dto.system.RolePermissionAssignDto;
 import com.bellego.domain.dto.system.RoleQueryDto;
 import com.bellego.domain.dto.system.RoleUpsertDto;
+import com.bellego.domain.vo.RolePermissionIdsVo;
 import com.bellego.domain.vo.RoleVo;
 import com.bellego.service.RoleService;
 import jakarta.validation.Valid;
@@ -30,6 +31,12 @@ public class RoleController {
     @PreAuthorize("hasAuthority('role:view')")
     public Result<IPage<RoleVo>> page(RoleQueryDto dto) {
         return ResultBuilder.success(PageConvertUtils.map(roleService.page(dto), voMapper::toRoleVo));
+    }
+
+    @GetMapping("/{id}/permissions")
+    @PreAuthorize("hasAuthority('role:view')")
+    public Result<RolePermissionIdsVo> permissionIds(@PathVariable String id) {
+        return ResultBuilder.success(new RolePermissionIdsVo(roleService.getPermissionIds(id)));
     }
 
     @PostMapping

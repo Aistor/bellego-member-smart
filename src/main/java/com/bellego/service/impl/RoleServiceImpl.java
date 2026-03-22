@@ -3,6 +3,7 @@ package com.bellego.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.bellego.common.exception.BusinessException;
 import com.bellego.domain.dto.system.RolePermissionAssignDto;
 import com.bellego.domain.dto.system.RoleQueryDto;
 import com.bellego.domain.dto.system.RoleUpsertDto;
@@ -16,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Date;
+import java.util.List;
 
 /**
  * 角色服务实现
@@ -34,7 +36,9 @@ public class RoleServiceImpl implements RoleService {
     @Override
     public IPage<Role> page(RoleQueryDto dto) {
         log.info("开始分页查询角色，关键字={}", dto.getKeyword());
-        LambdaQueryWrapper<Role> wrapper = new LambdaQueryWrapper<Role>().and(dto.getKeyword() != null && !dto.getKeyword().isBlank(), q -> q.like(Role::getName, dto.getKeyword()).or().like(Role::getCode, dto.getKeyword())).orderByDesc(Role::getCreateTime);
+        LambdaQueryWrapper<Role> wrapper = new LambdaQueryWrapper<Role>()
+                .and(dto.getKeyword() != null && !dto.getKeyword().isBlank(), q -> q.like(Role::getName, dto.getKeyword()).or().like(Role::getCode, dto.getKeyword()))
+                .orderByDesc(Role::getCreateTime);
         return roleMapper.selectPage(new Page<>(dto.getPageNum(), dto.getPageSize()), wrapper);
     }
 
@@ -78,5 +82,18 @@ public class RoleServiceImpl implements RoleService {
             relation.setPermissionId(permissionId);
             rolePermissionMapper.insert(relation);
         });
+    }
+
+    @Override
+    public List<String> getPermissionIds(String id) {
+        log.info("开始查询角色已分配权限，roleId={}", id);
+        if (roleMapper.selectById(id) == null) {
+            log.error("查询角色权限失败，角色不存在，roleId={}", id);
+            throw new BusinessException("角色不存在");
+        }
+        return rolePermissionMapper.selectList(new LambdaQueryWrapper<RolePermission>().eq(RolePermission::getRoleId, id))
+                .stream()
+                .map(RolePermission::getPermissionId)
+                .toList();
     }
 }

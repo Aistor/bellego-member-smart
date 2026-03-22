@@ -9,7 +9,9 @@ import java.util.Date;
 public class ConsumptionVo {
     private String id;
     private String memberId;
+    private String memberName;
     private String storeId;
+    private String storeName;
     private BigDecimal amount;
     private Integer pointsEarned;
     private Date consumeTime;

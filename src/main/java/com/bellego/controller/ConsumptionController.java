@@ -4,7 +4,6 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.bellego.aop.LogOperation;
 import com.bellego.common.result.Result;
 import com.bellego.common.result.ResultBuilder;
-import com.bellego.common.util.PageConvertUtils;
 import com.bellego.common.util.VoMapper;
 import com.bellego.domain.dto.member.ConsumptionCreateDto;
 import com.bellego.domain.dto.member.ConsumptionQueryDto;
@@ -29,7 +28,7 @@ public class ConsumptionController {
     @GetMapping
     @PreAuthorize("hasAuthority('consumption:view')")
     public Result<IPage<ConsumptionVo>> page(ConsumptionQueryDto dto) {
-        return ResultBuilder.success(PageConvertUtils.map(consumptionService.page(dto), voMapper::toConsumptionVo));
+        return ResultBuilder.success(consumptionService.page(dto));
     }
 
     @GetMapping("/{id}")

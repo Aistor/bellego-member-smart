@@ -12,6 +12,7 @@ import com.bellego.domain.entity.MemberConsumption;
 import com.bellego.domain.entity.PointDetail;
 import com.bellego.domain.entity.PointRule;
 import com.bellego.domain.entity.Store;
+import com.bellego.domain.vo.ConsumptionVo;
 import com.bellego.mapper.MemberConsumptionMapper;
 import com.bellego.mapper.MemberMapper;
 import com.bellego.mapper.StoreMapper;
@@ -25,8 +26,11 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 消费记录服务实现
@@ -53,13 +57,40 @@ public class ConsumptionServiceImpl implements ConsumptionService {
     }
 
     @Override
-    public IPage<MemberConsumption> page(ConsumptionQueryDto dto) {
+    public IPage<ConsumptionVo> page(ConsumptionQueryDto dto) {
         log.info("开始分页查询消费记录，memberId={}, storeId={}", dto.getMemberId(), dto.getStoreId());
         LambdaQueryWrapper<MemberConsumption> wrapper = new LambdaQueryWrapper<MemberConsumption>()
                 .eq(dto.getMemberId() != null && !dto.getMemberId().isBlank(), MemberConsumption::getMemberId, dto.getMemberId())
                 .eq(dto.getStoreId() != null && !dto.getStoreId().isBlank(), MemberConsumption::getStoreId, dto.getStoreId())
                 .orderByDesc(MemberConsumption::getConsumeTime);
-        return consumptionMapper.selectPage(new Page<>(dto.getPageNum(), dto.getPageSize()), wrapper);
+        Page<MemberConsumption> page = consumptionMapper.selectPage(new Page<>(dto.getPageNum(), dto.getPageSize()), wrapper);
+        List<MemberConsumption> records = page.getRecords();
+        Map<String, String> memberNameMap = records.isEmpty()
+                ? Collections.emptyMap()
+                : memberMapper.selectList(new LambdaQueryWrapper<Member>().in(Member::getId, records.stream().map(MemberConsumption::getMemberId).distinct().toList()))
+                        .stream()
+                        .collect(Collectors.toMap(Member::getId, Member::getName, (left, right) -> left));
+        Map<String, String> storeNameMap = records.isEmpty()
+                ? Collections.emptyMap()
+                : storeMapper.selectList(new LambdaQueryWrapper<Store>().in(Store::getId, records.stream().map(MemberConsumption::getStoreId).distinct().toList()))
+                        .stream()
+                        .collect(Collectors.toMap(Store::getId, Store::getName, (left, right) -> left));
+
+        Page<ConsumptionVo> result = new Page<>(page.getCurrent(), page.getSize(), page.getTotal());
+        result.setRecords(records.stream().map(item -> {
+            ConsumptionVo vo = new ConsumptionVo();
+            vo.setId(item.getId());
+            vo.setMemberId(item.getMemberId());
+            vo.setMemberName(memberNameMap.get(item.getMemberId()));
+            vo.setStoreId(item.getStoreId());
+            vo.setStoreName(storeNameMap.get(item.getStoreId()));
+            vo.setAmount(item.getAmount());
+            vo.setPointsEarned(item.getPointsEarned());
+            vo.setConsumeTime(item.getConsumeTime());
+            vo.setCreateTime(item.getCreateTime());
+            return vo;
+        }).toList());
+        return result;
     }
 
     @Override
@@ -96,11 +127,13 @@ public class ConsumptionServiceImpl implements ConsumptionService {
         consumption.setConsumeTime(consumeTime);
         consumption.setCreateTime(new Date());
         consumptionMapper.insert(consumption);
+
         member.setTotalConsumption(member.getTotalConsumption().add(dto.getAmount()));
         member.setTotalPoints(member.getTotalPoints() + earnedPoints);
         member.setLastConsumeTime(consumeTime);
         member.setUpdateTime(new Date());
         memberMapper.updateById(member);
+
         PointDetail detail = new PointDetail();
         detail.setMemberId(member.getId());
         detail.setType(1);
@@ -111,6 +144,7 @@ public class ConsumptionServiceImpl implements ConsumptionService {
         detail.setRemark("消费积分入账");
         detail.setCreateTime(new Date());
         pointDetailService.save(detail);
+
         memberLevelService.upgradeMemberLevelIfNeeded(member.getId());
         log.info("消费记录新增成功，recordId={}, earnedPoints={}", consumption.getId(), earnedPoints);
     }

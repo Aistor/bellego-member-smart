@@ -1,6 +1,9 @@
 package com.bellego.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.bellego.domain.dto.marketing.PointRuleQueryDto;
 import com.bellego.domain.dto.marketing.PointRuleUpsertDto;
 import com.bellego.domain.entity.PointRule;
 import com.bellego.mapper.PointRuleMapper;
@@ -24,9 +27,13 @@ public class PointRuleServiceImpl implements PointRuleService {
     }
 
     @Override
-    public List<PointRule> list() {
-        log.info("开始查询积分规则列表");
-        return pointRuleMapper.selectList(new LambdaQueryWrapper<PointRule>().orderByDesc(PointRule::getCreateTime));
+    public IPage<PointRule> page(PointRuleQueryDto dto) {
+        log.info("开始分页查询积分规则，ruleName={}, status={}", dto.getRuleName(), dto.getStatus());
+        LambdaQueryWrapper<PointRule> wrapper = new LambdaQueryWrapper<PointRule>()
+                .like(dto.getRuleName() != null && !dto.getRuleName().isBlank(), PointRule::getRuleName, dto.getRuleName())
+                .eq(dto.getStatus() != null, PointRule::getStatus, dto.getStatus())
+                .orderByDesc(PointRule::getCreateTime);
+        return pointRuleMapper.selectPage(new Page<>(dto.getPageNum(), dto.getPageSize()), wrapper);
     }
 
     @Override
@@ -63,8 +70,14 @@ public class PointRuleServiceImpl implements PointRuleService {
     @Override
     public PointRule matchConsumptionRule(String levelId) {
         log.info("开始匹配消费积分规则，levelId={}", levelId);
-        List<PointRule> rules = pointRuleMapper.selectList(new LambdaQueryWrapper<PointRule>().eq(PointRule::getStatus, 1).eq(PointRule::getRuleType, 1).orderByDesc(PointRule::getApplicableLevelId));
-        return rules.stream().filter(rule -> rule.getApplicableLevelId() == null || rule.getApplicableLevelId().isBlank() || rule.getApplicableLevelId().equals(levelId)).findFirst().orElse(null);
+        List<PointRule> rules = pointRuleMapper.selectList(new LambdaQueryWrapper<PointRule>()
+                .eq(PointRule::getStatus, 1)
+                .eq(PointRule::getRuleType, 1)
+                .orderByDesc(PointRule::getApplicableLevelId));
+        return rules.stream()
+                .filter(rule -> rule.getApplicableLevelId() == null || rule.getApplicableLevelId().isBlank() || rule.getApplicableLevelId().equals(levelId))
+                .findFirst()
+                .orElse(null);
     }
 
     private void copy(PointRuleUpsertDto dto, PointRule rule) {

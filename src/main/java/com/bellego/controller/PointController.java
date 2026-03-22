@@ -8,6 +8,7 @@ import com.bellego.common.util.PageConvertUtils;
 import com.bellego.common.util.VoMapper;
 import com.bellego.domain.dto.common.StatusUpdateDto;
 import com.bellego.domain.dto.marketing.PointDetailQueryDto;
+import com.bellego.domain.dto.marketing.PointRuleQueryDto;
 import com.bellego.domain.dto.marketing.PointRuleUpsertDto;
 import com.bellego.domain.vo.PointDetailVo;
 import com.bellego.domain.vo.PointRuleVo;
@@ -17,8 +18,6 @@ import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-
-import java.util.List;
 
 @RestController
 public class PointController {
@@ -34,8 +33,8 @@ public class PointController {
 
     @GetMapping("/api/v1/point-rules")
     @PreAuthorize("hasAuthority('pointRule:view')")
-    public Result<List<PointRuleVo>> listRules() {
-        return ResultBuilder.success(pointRuleService.list().stream().map(voMapper::toPointRuleVo).toList());
+    public Result<IPage<PointRuleVo>> pageRules(PointRuleQueryDto dto) {
+        return ResultBuilder.success(PageConvertUtils.map(pointRuleService.page(dto), voMapper::toPointRuleVo));
     }
 
     @PostMapping("/api/v1/point-rules")

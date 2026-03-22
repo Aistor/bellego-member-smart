@@ -10,6 +10,7 @@ import com.bellego.domain.dto.common.StatusUpdateDto;
 import com.bellego.domain.dto.system.AdminQueryDto;
 import com.bellego.domain.dto.system.AdminRoleAssignDto;
 import com.bellego.domain.dto.system.AdminUpsertDto;
+import com.bellego.domain.vo.AdminRoleIdsVo;
 import com.bellego.domain.vo.AdminVo;
 import com.bellego.service.AdminService;
 import jakarta.validation.Valid;
@@ -31,6 +32,12 @@ public class AdminController {
     @PreAuthorize("hasAuthority('admin:view')")
     public Result<IPage<AdminVo>> page(AdminQueryDto dto) {
         return ResultBuilder.success(PageConvertUtils.map(adminService.page(dto), voMapper::toAdminVo));
+    }
+
+    @GetMapping("/{id}/roles")
+    @PreAuthorize("hasAuthority('admin:view')")
+    public Result<AdminRoleIdsVo> roleIds(@PathVariable String id) {
+        return ResultBuilder.success(new AdminRoleIdsVo(adminService.getRoleIds(id)));
     }
 
     @PostMapping

@@ -8,7 +8,9 @@ import java.util.Date;
 public class MemberCouponVo {
     private String id;
     private String memberId;
+    private String memberName;
     private String couponId;
+    private String couponName;
     private String code;
     private Integer status;
     private Date receiveTime;

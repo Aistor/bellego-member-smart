@@ -50,7 +50,9 @@ public class AdminServiceImpl implements AdminService {
         log.info("开始分页查询管理员，关键字={}, 状态={}", dto.getKeyword(), dto.getStatus());
         LambdaQueryWrapper<Admin> wrapper = new LambdaQueryWrapper<Admin>()
                 .eq(dto.getStatus() != null, Admin::getStatus, dto.getStatus())
-                .and(dto.getKeyword() != null && !dto.getKeyword().isBlank(), q -> q.like(Admin::getUsername, dto.getKeyword()).or().like(Admin::getRealName, dto.getKeyword()).or().like(Admin::getPhone, dto.getKeyword()))
+                .and(dto.getKeyword() != null && !dto.getKeyword().isBlank(), q -> q.like(Admin::getUsername, dto.getKeyword())
+                        .or().like(Admin::getRealName, dto.getKeyword())
+                        .or().like(Admin::getPhone, dto.getKeyword()))
                 .orderByDesc(Admin::getCreateTime);
         Page<Admin> page = adminMapper.selectPage(new Page<>(dto.getPageNum(), dto.getPageSize()), wrapper);
         page.getRecords().forEach(admin -> admin.setPassword(null));
@@ -134,6 +136,19 @@ public class AdminServiceImpl implements AdminService {
             adminRole.setRoleId(roleId);
             adminRoleMapper.insert(adminRole);
         });
+    }
+
+    @Override
+    public List<String> getRoleIds(String id) {
+        log.info("开始查询管理员已分配角色，adminId={}", id);
+        if (adminMapper.selectById(id) == null) {
+            log.error("查询管理员角色失败，管理员不存在，adminId={}", id);
+            throw new BusinessException("管理员不存在");
+        }
+        return adminRoleMapper.selectList(new LambdaQueryWrapper<AdminRole>().eq(AdminRole::getAdminId, id))
+                .stream()
+                .map(AdminRole::getRoleId)
+                .toList();
     }
 
     @Override

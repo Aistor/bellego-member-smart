@@ -1,12 +1,12 @@
 package com.bellego.service;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.bellego.domain.dto.marketing.PointRuleQueryDto;
 import com.bellego.domain.dto.marketing.PointRuleUpsertDto;
 import com.bellego.domain.entity.PointRule;
 
-import java.util.List;
-
 public interface PointRuleService {
-    List<PointRule> list();
+    IPage<PointRule> page(PointRuleQueryDto dto);
     void create(PointRuleUpsertDto dto);
     void update(String id, PointRuleUpsertDto dto);
     void delete(String id);

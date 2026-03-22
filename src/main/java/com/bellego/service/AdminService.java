@@ -17,6 +17,7 @@ public interface AdminService {
     void delete(String id);
     void updateStatus(String id, Integer status);
     void assignRoles(String id, AdminRoleAssignDto dto);
+    List<String> getRoleIds(String id);
     Admin getByUsername(String username);
     LoginAdmin loadLoginAdmin(String adminId);
     List<String> findPermissionCodes(String adminId);
