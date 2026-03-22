@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bellego.mapper.MemberConsumptionMapper">
+
+    <select id="getDailyTotalAmount" resultType="com.bellego.domain.vo.DailyConsumeVO">
+        SELECT DATE(consume_time) AS consume_date, SUM(amount) AS total_amount
+        FROM member_consumption
+        <where>
+            <if test="start != null">
+                AND consume_time >= #{start}
+            </if>
+            <if test="end != null">
+                AND consume_time &lt; #{end}
+            </if>
+        </where>
+        GROUP BY consume_date
+        ORDER BY consume_date DESC
+    </select>
+
+</mapper>

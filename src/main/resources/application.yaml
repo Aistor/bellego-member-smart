@@ -1,5 +1,5 @@
 server:
-  port: 1088
+  port: 1099
 spring:
   application:
     name: bellego-member-smart
@@ -22,6 +22,7 @@ mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true
     log-impl: org.apache.ibatis.logging.slf4j.Slf4jImpl
+  mapper-locations: classpath*:Mapper/*.xml
 bellego:
   jwt:
     secret: bellego-member-smart-jwt-secret-key-2026-demo

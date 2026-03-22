@@ -3,6 +3,8 @@ package com.bellego.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.bellego.domain.entity.Member;
 import com.bellego.domain.entity.MemberConsumption;
+import com.bellego.domain.vo.DailyConsumeVO;
+import com.bellego.domain.vo.MemberLevelCountVo;
 import com.bellego.mapper.MemberConsumptionMapper;
 import com.bellego.mapper.MemberMapper;
 import com.bellego.service.AnalysisService;
@@ -13,12 +15,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.TreeMap;
+import java.util.*;
 import java.util.stream.Collectors;
 
 /**
@@ -106,6 +103,49 @@ public class AnalysisServiceImpl implements AnalysisService {
         List<MemberConsumption> consumptions = consumptionMapper.selectList(new LambdaQueryWrapper<>());
         Map<Integer, Long> distribution = consumptions.stream().filter(item -> item.getConsumeTime() != null).collect(Collectors.groupingBy(item -> item.getConsumeTime().toInstant().atZone(ZoneId.systemDefault()).getHour(), TreeMap::new, Collectors.counting()));
         return Map.of("distribution", distribution);
+    }
+
+    @Override
+    public List<MemberLevelCountVo> levelCount() {
+        log.info("开始查询会员等级分布");
+        return memberMapper.getLevelCount();
+    }
+
+    @Override
+    public List<DailyConsumeVO> dailyConsume() {
+        log.info("开始查询最近消费趋势");
+        // 查询最新消费时间
+        MemberConsumption latest = consumptionMapper.selectOne(new LambdaQueryWrapper<MemberConsumption>()
+                .orderByDesc(MemberConsumption::getConsumeTime)
+                .last("LIMIT 1"));
+        Date latestConsumeTime = latest.getConsumeTime();
+        LocalDate endDate = latestConsumeTime.toInstant()
+                .atZone(ZoneId.systemDefault())
+                .toLocalDate();
+
+        // 计算起始日期并转换为 Date
+        LocalDate startDate = endDate.minusDays(9);
+        Date startDateTime = Date.from(startDate.atStartOfDay(ZoneId.systemDefault()).toInstant());
+        Date endDateTime = Date.from(endDate.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant()); // 下一天的 00:00:00
+
+        List<DailyConsumeVO> dailyTotalAmount = consumptionMapper.getDailyTotalAmount(startDateTime, endDateTime);
+
+        // 填充缺失的日期
+        Map<LocalDate, DailyConsumeVO> dateMap = new LinkedHashMap<>();
+        for (DailyConsumeVO vo : dailyTotalAmount) {
+            dateMap.put(vo.getConsumeDate(), vo);
+        }
+        List<DailyConsumeVO> result = new ArrayList<>();
+        for (LocalDate date = startDate; !date.isAfter(endDate); date = date.plusDays(1)) {
+            DailyConsumeVO vo = dateMap.get(date);
+            if (vo == null) {
+                vo = new DailyConsumeVO();
+                vo.setConsumeDate(date);
+                vo.setTotalAmount(BigDecimal.ZERO);
+            }
+            result.add(vo);
+        }
+        return result;
     }
 
     private int scoreRecency(long days) {

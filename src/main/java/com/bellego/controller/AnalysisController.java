@@ -2,6 +2,8 @@ package com.bellego.controller;
 
 import com.bellego.common.result.Result;
 import com.bellego.common.result.ResultBuilder;
+import com.bellego.domain.vo.DailyConsumeVO;
+import com.bellego.domain.vo.MemberLevelCountVo;
 import com.bellego.service.AnalysisService;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -9,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -49,6 +52,18 @@ public class AnalysisController {
     @PreAuthorize("hasAuthority('analysis:view')")
     public Result<Map<String, Object>> timeDistribution() {
         return ResultBuilder.success(analysisService.timeDistribution());
+    }
+
+    @GetMapping("/behavior/level-count")
+    @PreAuthorize("hasAuthority('analysis:view')")
+    public Result<List<MemberLevelCountVo>> levelCount() {
+        return ResultBuilder.success(analysisService.levelCount());
+    }
+
+    @GetMapping("/behavior/daily-consume")
+    @PreAuthorize("hasAuthority('analysis:view')")
+    public Result<List<DailyConsumeVO>> dailyConsume() {
+        return ResultBuilder.success(analysisService.dailyConsume());
     }
 }
 
