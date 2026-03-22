@@ -32,8 +32,9 @@ public class AnalysisController {
 
     @GetMapping("/lifecycle")
     @PreAuthorize("hasAuthority('analysis:view')")
-    public Result<Map<String, Object>> lifecycle(@RequestParam(defaultValue = "DAY") String period) {
-        return ResultBuilder.success(analysisService.lifecycle(period));
+    public Result<Map<String, Object>> lifecycle(@RequestParam(defaultValue = "DAY") String period,
+                                                 @RequestParam(required = false) String month) {
+        return ResultBuilder.success(analysisService.lifecycle(period, month));
     }
 
     @GetMapping("/behavior/order-amount")
@@ -66,4 +67,3 @@ public class AnalysisController {
         return ResultBuilder.success(analysisService.dailyConsume());
     }
 }
-

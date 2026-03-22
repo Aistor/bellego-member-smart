@@ -1,6 +1,7 @@
 package com.bellego.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.bellego.common.exception.BusinessException;
 import com.bellego.domain.entity.Member;
 import com.bellego.domain.entity.MemberConsumption;
 import com.bellego.domain.vo.DailyConsumeVO;
@@ -13,9 +14,16 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 
 /**
@@ -56,13 +64,31 @@ public class AnalysisServiceImpl implements AnalysisService {
     }
 
     @Override
-    public Map<String, Object> lifecycle(String period) {
-        log.info("开始执行会员生命周期分析，period={}", period);
-        List<Member> members = memberMapper.selectList(new LambdaQueryWrapper<>());
-        Map<String, Long> newTrend = members.stream().filter(member -> member.getCreateTime() != null).collect(Collectors.groupingBy(member -> bucket(member.getCreateTime(), period), LinkedHashMap::new, Collectors.counting()));
-        long active = members.stream().filter(member -> member.getLastConsumeTime() != null && daysBetween(member.getLastConsumeTime(), new Date()) <= 30).count();
-        long lost = members.stream().filter(member -> member.getLastConsumeTime() == null || daysBetween(member.getLastConsumeTime(), new Date()) > 90).count();
-        return Map.of("newTrend", newTrend, "activeCount", active, "lostCount", lost, "totalMembers", members.size());
+    public Map<String, Object> lifecycle(String period, String month) {
+        log.info("开始执行会员生命周期分析，period={}, month={}", period, month);
+        List<Member> members = memberMapper.selectList(new LambdaQueryWrapper<Member>().orderByAsc(Member::getCreateTime));
+        Map<String, Long> newTrend = members.stream()
+                .filter(member -> member.getCreateTime() != null)
+                .collect(Collectors.groupingBy(member -> bucket(member.getCreateTime(), period), LinkedHashMap::new, Collectors.counting()));
+
+        LocalDate snapshotDate = resolveSnapshotDate(month);
+        List<Member> snapshotMembers = members.stream()
+                .filter(member -> member.getCreateTime() != null)
+                .filter(member -> !member.getCreateTime().toInstant().atZone(ZoneId.systemDefault()).toLocalDate().isAfter(snapshotDate))
+                .toList();
+
+        long activeCount = snapshotMembers.stream().filter(member -> isActiveAt(member, snapshotDate)).count();
+        long lostCount = snapshotMembers.stream().filter(member -> isLostAt(member, snapshotDate)).count();
+        long silentCount = snapshotMembers.stream().filter(member -> isSilentAt(member, snapshotDate)).count();
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("newTrend", newTrend);
+        result.put("month", month);
+        result.put("activeCount", activeCount);
+        result.put("lostCount", lostCount);
+        result.put("silentCount", silentCount);
+        result.put("totalMembers", snapshotMembers.size());
+        return result;
     }
 
     @Override
@@ -76,12 +102,15 @@ public class AnalysisServiceImpl implements AnalysisService {
         bucketCount.put("500+", 0L);
         consumptions.forEach(item -> {
             BigDecimal amount = item.getAmount();
-            if (amount.compareTo(BigDecimal.valueOf(100)) <= 0) bucketCount.computeIfPresent("0-100", (k, v) -> v + 1);
-            else if (amount.compareTo(BigDecimal.valueOf(300)) <= 0)
+            if (amount.compareTo(BigDecimal.valueOf(100)) <= 0) {
+                bucketCount.computeIfPresent("0-100", (k, v) -> v + 1);
+            } else if (amount.compareTo(BigDecimal.valueOf(300)) <= 0) {
                 bucketCount.computeIfPresent("101-300", (k, v) -> v + 1);
-            else if (amount.compareTo(BigDecimal.valueOf(500)) <= 0)
+            } else if (amount.compareTo(BigDecimal.valueOf(500)) <= 0) {
                 bucketCount.computeIfPresent("301-500", (k, v) -> v + 1);
-            else bucketCount.computeIfPresent("500+", (k, v) -> v + 1);
+            } else {
+                bucketCount.computeIfPresent("500+", (k, v) -> v + 1);
+            }
         });
         return Map.of("buckets", bucketCount, "totalOrders", consumptions.size());
     }
@@ -101,7 +130,9 @@ public class AnalysisServiceImpl implements AnalysisService {
     public Map<String, Object> timeDistribution() {
         log.info("开始执行消费时段分析");
         List<MemberConsumption> consumptions = consumptionMapper.selectList(new LambdaQueryWrapper<>());
-        Map<Integer, Long> distribution = consumptions.stream().filter(item -> item.getConsumeTime() != null).collect(Collectors.groupingBy(item -> item.getConsumeTime().toInstant().atZone(ZoneId.systemDefault()).getHour(), TreeMap::new, Collectors.counting()));
+        Map<Integer, Long> distribution = consumptions.stream()
+                .filter(item -> item.getConsumeTime() != null)
+                .collect(Collectors.groupingBy(item -> item.getConsumeTime().toInstant().atZone(ZoneId.systemDefault()).getHour(), TreeMap::new, Collectors.counting()));
         return Map.of("distribution", distribution);
     }
 
@@ -118,19 +149,16 @@ public class AnalysisServiceImpl implements AnalysisService {
         MemberConsumption latest = consumptionMapper.selectOne(new LambdaQueryWrapper<MemberConsumption>()
                 .orderByDesc(MemberConsumption::getConsumeTime)
                 .last("LIMIT 1"));
+        if (latest == null || latest.getConsumeTime() == null) {
+            return List.of();
+        }
         Date latestConsumeTime = latest.getConsumeTime();
-        LocalDate endDate = latestConsumeTime.toInstant()
-                .atZone(ZoneId.systemDefault())
-                .toLocalDate();
-
-        // 计算起始日期并转换为 Date
+        LocalDate endDate = latestConsumeTime.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
         LocalDate startDate = endDate.minusDays(9);
         Date startDateTime = Date.from(startDate.atStartOfDay(ZoneId.systemDefault()).toInstant());
-        Date endDateTime = Date.from(endDate.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant()); // 下一天的 00:00:00
+        Date endDateTime = Date.from(endDate.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant());
 
         List<DailyConsumeVO> dailyTotalAmount = consumptionMapper.getDailyTotalAmount(startDateTime, endDateTime);
-
-        // 填充缺失的日期
         Map<LocalDate, DailyConsumeVO> dateMap = new LinkedHashMap<>();
         for (DailyConsumeVO vo : dailyTotalAmount) {
             dateMap.put(vo.getConsumeDate(), vo);
@@ -176,10 +204,41 @@ public class AnalysisServiceImpl implements AnalysisService {
         return ChronoUnit.DAYS.between(start.toInstant().atZone(ZoneId.systemDefault()).toLocalDate(), end.toInstant().atZone(ZoneId.systemDefault()).toLocalDate());
     }
 
+    private long daysBetween(Date start, LocalDate end) {
+        return ChronoUnit.DAYS.between(start.toInstant().atZone(ZoneId.systemDefault()).toLocalDate(), end);
+    }
+
+    private LocalDate resolveSnapshotDate(String month) {
+        if (month == null || month.isBlank()) {
+            return LocalDate.now();
+        }
+        try {
+            return YearMonth.parse(month).atEndOfMonth();
+        } catch (Exception ex) {
+            log.error("月份解析失败，month 格式错误，month={}", month);
+            throw new BusinessException("month 格式错误，应为 yyyy-MM");
+        }
+    }
+
+    private boolean isActiveAt(Member member, LocalDate snapshotDate) {
+        return member.getLastConsumeTime() != null && daysBetween(member.getLastConsumeTime(), snapshotDate) <= 30;
+    }
+
+    private boolean isLostAt(Member member, LocalDate snapshotDate) {
+        return member.getLastConsumeTime() == null || daysBetween(member.getLastConsumeTime(), snapshotDate) > 90;
+    }
+
+    private boolean isSilentAt(Member member, LocalDate snapshotDate) {
+        return member.getLastConsumeTime() != null
+                && daysBetween(member.getLastConsumeTime(), snapshotDate) > 30
+                && daysBetween(member.getLastConsumeTime(), snapshotDate) <= 90;
+    }
+
     private String bucket(Date date, String period) {
         LocalDate localDate = date.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
-        if ("MONTH".equalsIgnoreCase(period))
+        if ("MONTH".equalsIgnoreCase(period)) {
             return localDate.getYear() + "-" + String.format("%02d", localDate.getMonthValue());
+        }
         return localDate.toString();
     }
 }
