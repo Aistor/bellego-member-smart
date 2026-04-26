@@ -1,4 +1,4 @@
-package com.bellego.domain.vo;
+package com.bellego.domain.vo.analysis;
 
 import lombok.Data;
 

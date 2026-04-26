@@ -9,7 +9,6 @@ import java.time.LocalDate;
 @Data
 public class MemberUpsertDto {
     private String levelId;
-    @NotBlank(message = "会员卡号不能为空")
     private String cardNumber;
     @NotBlank(message = "会员姓名不能为空")
     private String name;

@@ -2,7 +2,7 @@
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
 <mapper namespace="com.bellego.mapper.MemberMapper">
 
-    <select id="getLevelCount" resultType="com.bellego.domain.vo.MemberLevelCountVo">
+    <select id="getLevelCount" resultType="com.bellego.domain.vo.analysis.MemberLevelCountVO">
         SELECT a.level_id AS levelId, b.name AS levelName, COUNT(*) AS count
         FROM member a
         LEFT JOIN member_level b ON a.level_id = b.id

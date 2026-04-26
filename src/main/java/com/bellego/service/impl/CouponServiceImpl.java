@@ -18,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
@@ -95,12 +96,25 @@ public class CouponServiceImpl implements CouponService {
     @Transactional(rollbackFor = Exception.class)
     public void issue(String id, CouponIssueDto dto) {
         Coupon coupon = getById(id);
-        List<String> memberIds = Boolean.TRUE.equals(dto.getIssueAll())
-                ? memberMapper.selectList(new LambdaQueryWrapper<Member>().eq(Member::getStatus, 1)).stream().map(Member::getId).toList()
-                : dto.getMemberIds();
-        if (memberIds == null || memberIds.isEmpty()) {
-            log.error("发放优惠券失败，会员列表为空，couponId={}", id);
-            throw new BusinessException("请选择发放会员");
+        List<String> memberIds = new ArrayList<>();
+        if (dto.getType() == 1) {
+            if (dto.getMemberIds() == null || dto.getMemberIds().isEmpty()) {
+                log.error("发放优惠券失败，会员列表为空，couponId={}", id);
+                throw new BusinessException("会员列表为空");
+            }
+            memberIds.addAll(dto.getMemberIds());
+        } else if (dto.getType() == 2) {
+            if (dto.getLevelIds() == null || dto.getLevelIds().isEmpty()) {
+                log.error("发放优惠券失败，等级列表为空，couponId={}", id);
+                throw new BusinessException("等级列表为空");
+            }
+            memberIds = memberMapper.selectList(
+                    new LambdaQueryWrapper<Member>().in(Member::getLevelId, dto.getLevelIds()).eq(Member::getStatus, 1)
+            ).stream().map(Member::getId).toList();
+            if (memberIds.isEmpty()) {
+                log.error("发放优惠券失败，所选等级下无可用会员，couponId={}, levelIds={}", id, dto.getLevelIds());
+                throw new BusinessException("所选等级下无可用会员");
+            }
         }
         if (coupon.getStock() < memberIds.size()) {
             log.error("发放优惠券失败，库存不足，couponId={}, stock={}, need={}", id, coupon.getStock(), memberIds.size());
@@ -108,6 +122,7 @@ public class CouponServiceImpl implements CouponService {
         }
         log.info("开始发放优惠券，couponId={}, memberCount={}", id, memberIds.size());
         Date now = new Date();
+        List<MemberCoupon> memberCoupons = new ArrayList<>();
         for (String memberId : memberIds) {
             MemberCoupon memberCoupon = new MemberCoupon();
             memberCoupon.setMemberId(memberId);
@@ -116,8 +131,9 @@ public class CouponServiceImpl implements CouponService {
             memberCoupon.setStatus(0);
             memberCoupon.setReceiveTime(now);
             memberCoupon.setExpireTime(coupon.getEndTime());
-            memberCouponMapper.insert(memberCoupon);
+            memberCoupons.add(memberCoupon);
         }
+        memberCouponMapper.insert(memberCoupons);
         coupon.setStock(coupon.getStock() - memberIds.size());
         coupon.setTotalIssued((coupon.getTotalIssued() == null ? 0 : coupon.getTotalIssued()) + memberIds.size());
         couponMapper.updateById(coupon);

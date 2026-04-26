@@ -2,7 +2,7 @@ package com.bellego.mapper;
 
 import com.baomidou.mybatisplus.core.mapper.BaseMapper;
 import com.bellego.domain.entity.MemberConsumption;
-import com.bellego.domain.vo.DailyConsumeVO;
+import com.bellego.domain.vo.analysis.DailyConsumeVO;
 import org.apache.ibatis.annotations.Mapper;
 
 import java.util.Date;

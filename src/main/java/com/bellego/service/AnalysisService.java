@@ -1,17 +1,20 @@
 package com.bellego.service;
 
-import com.bellego.domain.vo.DailyConsumeVO;
-import com.bellego.domain.vo.MemberLevelCountVo;
+import com.bellego.domain.vo.analysis.DailyConsumeVO;
+import com.bellego.domain.vo.analysis.MemberCategoryVO;
+import com.bellego.domain.vo.analysis.MemberGrowthVO;
+import com.bellego.domain.vo.analysis.MemberLevelCountVO;
 
 import java.util.List;
 import java.util.Map;
 
 public interface AnalysisService {
     Map<String, Object> rfm();
-    Map<String, Object> lifecycle(String period, String month);
     Map<String, Object> orderAmount();
     Map<String, Object> repurchase();
     Map<String, Object> timeDistribution();
-    List<MemberLevelCountVo> levelCount();
+    List<MemberLevelCountVO> levelCount();
     List<DailyConsumeVO> dailyConsume();
+    List<MemberGrowthVO> memberGrowth(String date);
+    List<MemberCategoryVO> memberCategory(String date);
 }

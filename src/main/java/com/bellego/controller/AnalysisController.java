@@ -2,8 +2,10 @@ package com.bellego.controller;
 
 import com.bellego.common.result.Result;
 import com.bellego.common.result.ResultBuilder;
-import com.bellego.domain.vo.DailyConsumeVO;
-import com.bellego.domain.vo.MemberLevelCountVo;
+import com.bellego.domain.vo.analysis.DailyConsumeVO;
+import com.bellego.domain.vo.analysis.MemberCategoryVO;
+import com.bellego.domain.vo.analysis.MemberGrowthVO;
+import com.bellego.domain.vo.analysis.MemberLevelCountVO;
 import com.bellego.service.AnalysisService;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -30,13 +32,6 @@ public class AnalysisController {
         return ResultBuilder.success(analysisService.rfm());
     }
 
-    @GetMapping("/lifecycle")
-    @PreAuthorize("hasAuthority('analysis:view')")
-    public Result<Map<String, Object>> lifecycle(@RequestParam(defaultValue = "DAY") String period,
-                                                 @RequestParam(required = false) String month) {
-        return ResultBuilder.success(analysisService.lifecycle(period, month));
-    }
-
     @GetMapping("/behavior/order-amount")
     @PreAuthorize("hasAuthority('analysis:view')")
     public Result<Map<String, Object>> orderAmount() {
@@ -57,7 +52,7 @@ public class AnalysisController {
 
     @GetMapping("/behavior/level-count")
     @PreAuthorize("hasAuthority('analysis:view')")
-    public Result<List<MemberLevelCountVo>> levelCount() {
+    public Result<List<MemberLevelCountVO>> levelCount() {
         return ResultBuilder.success(analysisService.levelCount());
     }
 
@@ -65,5 +60,17 @@ public class AnalysisController {
     @PreAuthorize("hasAuthority('analysis:view')")
     public Result<List<DailyConsumeVO>> dailyConsume() {
         return ResultBuilder.success(analysisService.dailyConsume());
+    }
+
+    @GetMapping("/category")
+    @PreAuthorize("hasAuthority('analysis:view')")
+    public Result<List<MemberCategoryVO>> memberCategory(@RequestParam(required = false) String date) {
+        return ResultBuilder.success(analysisService.memberCategory(date));
+    }
+
+    @GetMapping("/growth")
+    @PreAuthorize("hasAuthority('analysis:view')")
+    public Result<List<MemberGrowthVO>> memberGrowth(@RequestParam(required = false) String date) {
+        return ResultBuilder.success(analysisService.memberGrowth(date));
     }
 }

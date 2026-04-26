@@ -21,6 +21,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.Date;
 import java.util.List;
+import java.util.Random;
 
 /**
  * 会员服务实现
@@ -73,14 +74,14 @@ public class MemberServiceImpl implements MemberService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public void create(MemberUpsertDto dto) {
-        log.info("开始新增会员，手机号={}, 卡号={}", dto.getPhone(), dto.getCardNumber());
-        validateUnique(dto.getPhone(), dto.getCardNumber(), null);
+        log.info("开始新增会员，手机号={}", dto.getPhone());
+        validateUnique(dto.getPhone(), null);
         MemberLevel level = dto.getLevelId() == null || dto.getLevelId().isBlank()
                 ? memberLevelService.getDefaultLevel()
                 : memberLevelService.getById(dto.getLevelId());
         Member member = new Member();
         member.setLevelId(level.getId());
-        member.setCardNumber(dto.getCardNumber());
+        member.setCardNumber(generateUniqueCardNumber());
         member.setName(dto.getName());
         member.setPhone(dto.getPhone());
         member.setGender(dto.getGender());
@@ -102,9 +103,8 @@ public class MemberServiceImpl implements MemberService {
     public void update(String id, MemberUpsertDto dto) {
         log.info("开始修改会员，会员ID={}", id);
         Member member = getById(id);
-        validateUnique(dto.getPhone(), dto.getCardNumber(), id);
+        validateUnique(dto.getPhone(), id);
         member.setLevelId(dto.getLevelId() == null || dto.getLevelId().isBlank() ? member.getLevelId() : dto.getLevelId());
-        member.setCardNumber(dto.getCardNumber());
         member.setName(dto.getName());
         member.setPhone(dto.getPhone());
         member.setGender(dto.getGender());
@@ -135,28 +135,39 @@ public class MemberServiceImpl implements MemberService {
     public void importCsv(MultipartFile file) {
         List<MemberUpsertDto> list = csvImportUtils.read(file, parts -> {
             MemberUpsertDto dto = new MemberUpsertDto();
-            dto.setCardNumber(parts[0].trim());
-            dto.setName(parts[1].trim());
-            dto.setPhone(parts[2].trim());
-            dto.setGender(Integer.parseInt(parts[3].trim()));
-            dto.setBirthday(parts.length > 4 && !parts[4].isBlank() ? LocalDate.parse(parts[4].trim()) : null);
-            dto.setStatus(parts.length > 5 ? Integer.parseInt(parts[5].trim()) : 1);
+            dto.setName(parts[0].trim());
+            dto.setPhone(parts[1].trim());
+            dto.setGender(Integer.parseInt(parts[2].trim()));
+            dto.setBirthday(parts.length > 3 && !parts[3].isBlank() ? LocalDate.parse(parts[3].trim()) : null);
+            dto.setStatus(parts.length > 4 ? Integer.parseInt(parts[4].trim()) : 1);
             return dto;
         });
         log.info("开始导入会员，数量={}", list.size());
         list.forEach(this::create);
     }
 
-    private void validateUnique(String phone, String cardNumber, String excludeId) {
+    /**
+     * 生成16位唯一会员卡号
+     */
+    private String generateUniqueCardNumber() {
+        Random random = new Random();
+        String cardNumber;
+        do {
+            StringBuilder sb = new StringBuilder(16);
+            for (int i = 0; i < 16; i++) {
+                sb.append(random.nextInt(10));
+            }
+            cardNumber = sb.toString();
+        } while (memberMapper.selectOne(
+                new LambdaQueryWrapper<Member>().eq(Member::getCardNumber, cardNumber)) != null);
+        return cardNumber;
+    }
+
+    private void validateUnique(String phone, String excludeId) {
         Member phoneMember = memberMapper.selectOne(new LambdaQueryWrapper<Member>().eq(Member::getPhone, phone));
         if (phoneMember != null && !phoneMember.getId().equals(excludeId)) {
             log.error("手机号重复，phone={}", phone);
             throw new BusinessException("手机号已存在");
-        }
-        Member cardMember = memberMapper.selectOne(new LambdaQueryWrapper<Member>().eq(Member::getCardNumber, cardNumber));
-        if (cardMember != null && !cardMember.getId().equals(excludeId)) {
-            log.error("会员卡号重复，cardNumber={}", cardNumber);
-            throw new BusinessException("会员卡号已存在");
         }
     }
 }
