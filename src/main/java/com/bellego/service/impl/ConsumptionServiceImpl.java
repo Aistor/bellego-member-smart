@@ -139,7 +139,7 @@ public class ConsumptionServiceImpl implements ConsumptionService {
         detail.setType(1);
         detail.setPoints(earnedPoints);
         detail.setBalance(member.getTotalPoints());
-        detail.setSource("consumption");
+        detail.setSource("消费");
         detail.setSourceId(consumption.getId());
         detail.setRemark("消费积分入账");
         detail.setCreateTime(new Date());

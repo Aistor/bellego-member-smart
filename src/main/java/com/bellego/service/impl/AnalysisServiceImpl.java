@@ -11,6 +11,7 @@ import com.bellego.domain.vo.analysis.MemberLevelCountVO;
 import com.bellego.mapper.MemberConsumptionMapper;
 import com.bellego.mapper.MemberMapper;
 import com.bellego.service.AnalysisService;
+import com.bellego.utils.RedisUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
@@ -28,6 +29,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 /**
@@ -36,13 +38,17 @@ import java.util.stream.Collectors;
 @Slf4j
 @Service
 public class AnalysisServiceImpl implements AnalysisService {
+    private final RedisUtils redisUtils;
     private final MemberMapper memberMapper;
     private final MemberConsumptionMapper consumptionMapper;
 
-    public AnalysisServiceImpl(MemberMapper memberMapper, MemberConsumptionMapper consumptionMapper) {
+    public AnalysisServiceImpl(RedisUtils redisUtils, MemberMapper memberMapper, MemberConsumptionMapper consumptionMapper) {
+        this.redisUtils = redisUtils;
         this.memberMapper = memberMapper;
         this.consumptionMapper = consumptionMapper;
     }
+
+    private static final String REDIS_KEY_PREFIX = "analysis:";
 
     @Override
     public Map<String, Object> rfm() {
@@ -70,6 +76,13 @@ public class AnalysisServiceImpl implements AnalysisService {
     @Override
     public Map<String, Object> orderAmount() {
         log.info("开始执行客单价分布分析");
+        String key = REDIS_KEY_PREFIX + "orderAmount";
+        Map<String, Object> resultMap = (Map) redisUtils.get(key);
+        if (resultMap != null) {
+            log.info("缓存数据命中，直接返回");
+            return resultMap;
+        }
+        log.info("无缓存数据，重新计算");
         List<MemberConsumption> consumptions = consumptionMapper.selectList(new LambdaQueryWrapper<>());
         Map<String, Long> bucketCount = new LinkedHashMap<>();
         bucketCount.put("0-100", 0L);
@@ -88,28 +101,48 @@ public class AnalysisServiceImpl implements AnalysisService {
                 bucketCount.computeIfPresent("500+", (k, v) -> v + 1);
             }
         });
-        return Map.of("buckets", bucketCount, "totalOrders", consumptions.size());
+        // 将结果存入缓存
+        resultMap = Map.of("buckets", bucketCount, "totalOrders", consumptions.size());
+        redisUtils.set(key, resultMap, 2, TimeUnit.HOURS);
+
+        return resultMap;
     }
 
     @Override
     public Map<String, Object> repurchase() {
         log.info("开始执行复购率分析");
+        String key = REDIS_KEY_PREFIX + "repurchase";
+        Map<String, Object> resultMap = (Map) redisUtils.get(key);
+        if (resultMap != null) {
+            log.info("缓存数据命中，直接返回");
+            return resultMap;
+        }
         List<MemberConsumption> consumptions = consumptionMapper.selectList(new LambdaQueryWrapper<>());
         Map<String, Long> countByMember = consumptions.stream().collect(Collectors.groupingBy(MemberConsumption::getMemberId, Collectors.counting()));
         long repurchaseMembers = countByMember.values().stream().filter(count -> count >= 2).count();
         long totalMembers = countByMember.size();
         double rate = totalMembers == 0 ? 0 : (double) repurchaseMembers / totalMembers;
-        return Map.of("repurchaseMembers", repurchaseMembers, "consumingMembers", totalMembers, "repurchaseRate", rate);
+        resultMap = Map.of("repurchaseMembers", repurchaseMembers, "consumingMembers", totalMembers, "repurchaseRate", rate);
+        redisUtils.set(key, resultMap, 2, TimeUnit.HOURS);
+        return resultMap;
     }
 
     @Override
     public Map<String, Object> timeDistribution() {
         log.info("开始执行消费时段分析");
+        String key = REDIS_KEY_PREFIX + "timeDistribution";
+        Map<String, Object> resultMap = (Map) redisUtils.get(key);
+        if (resultMap != null) {
+            log.info("缓存数据命中，直接返回");
+            return resultMap;
+        }
         List<MemberConsumption> consumptions = consumptionMapper.selectList(new LambdaQueryWrapper<>());
         Map<Integer, Long> distribution = consumptions.stream()
                 .filter(item -> item.getConsumeTime() != null)
                 .collect(Collectors.groupingBy(item -> item.getConsumeTime().toInstant().atZone(ZoneId.systemDefault()).getHour(), TreeMap::new, Collectors.counting()));
-        return Map.of("distribution", distribution);
+        resultMap = Map.of("distribution", distribution);
+        redisUtils.set(key, resultMap, 2, TimeUnit.HOURS);
+        return resultMap;
     }
 
     /**
@@ -168,6 +201,13 @@ public class AnalysisServiceImpl implements AnalysisService {
     @Override
     public List<MemberCategoryVO> memberCategory(String date) {
         log.info("开始执行会员类型分析");
+        String key = REDIS_KEY_PREFIX + "memberCategory:" + (date.isBlank() ? "all" : date);
+        List<MemberCategoryVO> resultList = (List) redisUtils.get(key);
+        if (resultList != null) {
+            log.info("缓存数据命中，直接返回");
+            return resultList;
+        }
+        log.info("无缓存数据，重新计算");
         // 解析日期，获取统计截止时点
         LocalDate snapshotDate = resolveDate(date);
         // 查询所有会员
@@ -200,19 +240,29 @@ public class AnalysisServiceImpl implements AnalysisService {
             result.add(vo);
         });
 
+        redisUtils.set(key, result, 2, TimeUnit.HOURS);
         log.info("会员类型分析完成，截止 {}，总会员数：{}", snapshotDate, snapshotMembers.size());
         return result;
     }
 
     @Override
     public List<MemberGrowthVO> memberGrowth(String date) {
-        if (date == null || date.isBlank()) {
+        String key = REDIS_KEY_PREFIX + "memberGrowth:" + (date.isBlank() ? "all" : date);
+        List<MemberGrowthVO> resultList = (List) redisUtils.get(key);
+        if (resultList != null) {
+            log.info("会员增长数，缓存数据命中，直接返回");
+            return resultList;
+        }
+        log.info("会员增长数，无缓存数据，重新计算");
+        if (date.isBlank()) {
             // date为空，查询所有月份的会员增长数
-            return getMonthsGrowth();
+            resultList = getMonthsGrowth();
         } else {
             // date不为空，查询指定月份的每日增长数
-            return getDailyGrowth(date);
+            resultList = getDailyGrowth(date);
         }
+        redisUtils.set(key, resultList, 2, TimeUnit.HOURS);
+        return resultList;
     }
 
     /**

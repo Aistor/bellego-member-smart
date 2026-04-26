@@ -32,7 +32,10 @@ public class PointDetailServiceImpl implements PointDetailService {
     @Override
     public IPage<PointDetail> page(PointDetailQueryDto dto) {
         log.info("开始分页查询积分明细，memberId={}, type={}", dto.getMemberId(), dto.getType());
-        LambdaQueryWrapper<PointDetail> wrapper = new LambdaQueryWrapper<PointDetail>().eq(dto.getMemberId() != null && !dto.getMemberId().isBlank(), PointDetail::getMemberId, dto.getMemberId()).eq(dto.getType() != null, PointDetail::getType, dto.getType()).orderByDesc(PointDetail::getCreateTime);
+        LambdaQueryWrapper<PointDetail> wrapper = new LambdaQueryWrapper<PointDetail>()
+                .eq(dto.getMemberId() != null && !dto.getMemberId().isBlank(), PointDetail::getMemberId, dto.getMemberId())
+                .eq(dto.getType() != null, PointDetail::getType, dto.getType())
+                .orderByDesc(PointDetail::getCreateTime);
         return pointDetailMapper.selectPage(new Page<>(dto.getPageNum(), dto.getPageSize()), wrapper);
     }
 

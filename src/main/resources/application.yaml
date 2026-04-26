@@ -11,6 +11,12 @@ spring:
   jackson:
     time-zone: Asia/Shanghai
     date-format: yyyy-MM-dd HH:mm:ss
+  data:
+    redis:
+      database: 8
+      host: localhost
+      port: 6379
+      timeout: 2000
 logging:
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %highlight(%-5level) %magenta([%thread]) %cyan(%logger{36}) - %msg%n"
