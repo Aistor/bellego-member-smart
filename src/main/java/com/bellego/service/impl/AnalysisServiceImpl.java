@@ -14,6 +14,7 @@ import com.bellego.mapper.MemberMapper;
 import com.bellego.service.AnalysisService;
 import com.bellego.utils.RedisUtils;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -51,23 +52,54 @@ public class AnalysisServiceImpl implements AnalysisService {
 
     private static final String REDIS_KEY_PREFIX = "analysis:";
 
+    @Value("${bellego.redis.expire-hours}")
+    Integer EXPIRE_HOURS;
+
     @Override
     public Map<String, Object> rfm(String date) {
         log.info("开始执行RFM分析，date={}", date);
-        List<Member> members = memberMapper.selectList(new LambdaQueryWrapper<>());
+        String key = REDIS_KEY_PREFIX + "rfm:" + (StringUtils.isNotBlank(date) ? date : "all");
+        Map<String, Object> resultMap = (Map) redisUtils.get(key);
+        if (resultMap != null) {
+            log.info("缓存数据命中，直接返回");
+            return resultMap;
+        }
         // 根据date筛选消费记录
-        LambdaQueryWrapper<MemberConsumption> queryWrapper = new LambdaQueryWrapper<>();
+        LambdaQueryWrapper<MemberConsumption> consumptionWrapper = new LambdaQueryWrapper<>();
+        LambdaQueryWrapper<Member> memberWrapper = new LambdaQueryWrapper<>();
         if (StringUtils.isNotBlank(date)) {
             LocalDate endDate = YearMonth.parse(date, DateTimeFormatter.ofPattern("yyyy-MM")).atEndOfMonth();
             Date endDateTime = Date.from(endDate.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant());
-            queryWrapper.le(MemberConsumption::getConsumeTime, endDateTime);
+            consumptionWrapper.le(MemberConsumption::getConsumeTime, endDateTime);
+            memberWrapper.le(Member::getLastConsumeTime, endDateTime);
         }
-        List<MemberConsumption> consumptions = consumptionMapper.selectList(queryWrapper);
+        List<Member> members = memberMapper.selectList(memberWrapper);
+        List<MemberConsumption> consumptions = consumptionMapper.selectList(consumptionWrapper);
         Map<String, Long> frequencyMap = consumptions.stream().collect(Collectors.groupingBy(MemberConsumption::getMemberId, Collectors.counting()));
         LocalDate referenceDate = StringUtils.isNotBlank(date)
                 ? YearMonth.parse(date, DateTimeFormatter.ofPattern("yyyy-MM")).atEndOfMonth()
                 : LocalDate.now();
-        return Map.of("totalMembers", members.size(), "segments", members.stream().map(member -> {
+
+        // 收集所有R、F、M值
+        List<Double> recencyValues = new ArrayList<>();
+        List<Double> frequencyValues = new ArrayList<>();
+        List<Double> monetaryValues = new ArrayList<>();
+        for (Member member : members) {
+            long recency = member.getLastConsumeTime() == null ? 999 : ChronoUnit.DAYS.between(member.getLastConsumeTime().toInstant().atZone(ZoneId.systemDefault()).toLocalDate(), referenceDate);
+            long frequency = frequencyMap.getOrDefault(member.getId(), 0L);
+            BigDecimal monetary = member.getTotalConsumption() == null ? BigDecimal.ZERO : member.getTotalConsumption();
+            recencyValues.add((double) recency);
+            frequencyValues.add((double) frequency);
+            monetaryValues.add(monetary.doubleValue());
+        }
+
+        // 计算分位数阈值（20%、40%、60%、80%）
+        double[] rThresholds = thresholdsCompute(recencyValues);
+        double[] fThresholds = thresholdsCompute(frequencyValues);
+        double[] mThresholds = thresholdsCompute(monetaryValues);
+
+        // 基于分位数评分
+        Map<String, Object> result = Map.of("totalMembers", members.size(), "segments", members.stream().map(member -> {
             Map<String, Object> item = new HashMap<>();
             long recency = member.getLastConsumeTime() == null ? 999 : ChronoUnit.DAYS.between(member.getLastConsumeTime().toInstant().atZone(ZoneId.systemDefault()).toLocalDate(), referenceDate);
             long frequency = frequencyMap.getOrDefault(member.getId(), 0L);
@@ -77,11 +109,14 @@ public class AnalysisServiceImpl implements AnalysisService {
             item.put("recencyDays", recency);
             item.put("frequency", frequency);
             item.put("monetary", monetary);
-            item.put("rLevel", scoreRecency(recency));
-            item.put("fLevel", scoreFrequency(frequency));
-            item.put("mLevel", scoreMonetary(monetary));
+            item.put("rLevel", getScore(recency, rThresholds, true));
+            item.put("fLevel", getScore(frequency, fThresholds, false));
+            item.put("mLevel", getScore(monetary.doubleValue(), mThresholds, false));
             return item;
         }).toList());
+        // 将结果存入缓存
+        redisUtils.set(key, result, EXPIRE_HOURS, TimeUnit.HOURS);
+        return result;
     }
 
     @Override
@@ -114,7 +149,7 @@ public class AnalysisServiceImpl implements AnalysisService {
         });
         // 将结果存入缓存
         resultMap = Map.of("buckets", bucketCount, "totalOrders", consumptions.size());
-        redisUtils.set(key, resultMap, 2, TimeUnit.HOURS);
+        redisUtils.set(key, resultMap, EXPIRE_HOURS, TimeUnit.HOURS);
 
         return resultMap;
     }
@@ -134,7 +169,7 @@ public class AnalysisServiceImpl implements AnalysisService {
         long totalMembers = countByMember.size();
         double rate = totalMembers == 0 ? 0 : (double) repurchaseMembers / totalMembers;
         resultMap = Map.of("repurchaseMembers", repurchaseMembers, "consumingMembers", totalMembers, "repurchaseRate", rate);
-        redisUtils.set(key, resultMap, 2, TimeUnit.HOURS);
+        redisUtils.set(key, resultMap, EXPIRE_HOURS, TimeUnit.HOURS);
         return resultMap;
     }
 
@@ -152,7 +187,7 @@ public class AnalysisServiceImpl implements AnalysisService {
                 .filter(item -> item.getConsumeTime() != null)
                 .collect(Collectors.groupingBy(item -> item.getConsumeTime().toInstant().atZone(ZoneId.systemDefault()).getHour(), TreeMap::new, Collectors.counting()));
         resultMap = Map.of("distribution", distribution);
-        redisUtils.set(key, resultMap, 2, TimeUnit.HOURS);
+        redisUtils.set(key, resultMap, EXPIRE_HOURS, TimeUnit.HOURS);
         return resultMap;
     }
 
@@ -251,7 +286,7 @@ public class AnalysisServiceImpl implements AnalysisService {
             result.add(vo);
         });
 
-        redisUtils.set(key, result, 2, TimeUnit.HOURS);
+        redisUtils.set(key, result, EXPIRE_HOURS, TimeUnit.HOURS);
         log.info("会员类型分析完成，截止 {}，总会员数：{}", snapshotDate, snapshotMembers.size());
         return result;
     }
@@ -272,7 +307,7 @@ public class AnalysisServiceImpl implements AnalysisService {
             // date不为空，查询指定月份的每日增长数
             resultList = getDailyGrowth(date);
         }
-        redisUtils.set(key, resultList, 2, TimeUnit.HOURS);
+        redisUtils.set(key, resultList, EXPIRE_HOURS, TimeUnit.HOURS);
         return resultList;
     }
 
@@ -349,36 +384,64 @@ public class AnalysisServiceImpl implements AnalysisService {
     }
 
     /**
-     * 计算会员的 R 值
+     * 获取会员消费数据的起始日期（yyyy-MM）
      */
-    private int scoreRecency(long days) {
-        if (days <= 7) return 5;
-        if (days <= 30) return 4;
-        if (days <= 60) return 3;
-        if (days <= 90) return 2;
-        return 1;
+    public String getStartDate() {
+        MemberConsumption consumption = consumptionMapper.selectOne(new LambdaQueryWrapper<MemberConsumption>()
+                .orderByAsc(MemberConsumption::getConsumeTime)
+                .last("limit 1"));
+        Date startDate = consumption.getConsumeTime();
+        // 格式化日期（yyyy-MM）
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM");
+        return startDate.toInstant()
+                .atZone(ZoneId.systemDefault())
+                .toLocalDate()
+                .format(formatter);
     }
 
     /**
-     * 计算会员的 F 值
+     * 计算分位数阈值（20%、40%、60%、80%）
      */
-    private int scoreFrequency(long count) {
-        if (count >= 20) return 5;
-        if (count >= 10) return 4;
-        if (count >= 5) return 3;
-        if (count >= 2) return 2;
-        return 1;
+    private double[] thresholdsCompute(List<Double> values) {
+        List<Double> sorted = values.stream().sorted().toList();
+        return new double[]{
+                percentile(sorted, 0.2),
+                percentile(sorted, 0.4),
+                percentile(sorted, 0.6),
+                percentile(sorted, 0.8)
+        };
     }
 
     /**
-     *  计算会员的 M 值
+     * 计算排序后列表的百分位数值（线性插值）
      */
-    private int scoreMonetary(BigDecimal amount) {
-        if (amount.compareTo(BigDecimal.valueOf(3000)) >= 0) return 5;
-        if (amount.compareTo(BigDecimal.valueOf(1500)) >= 0) return 4;
-        if (amount.compareTo(BigDecimal.valueOf(800)) >= 0) return 3;
-        if (amount.compareTo(BigDecimal.valueOf(200)) >= 0) return 2;
-        return 1;
+    private double percentile(List<Double> sorted, double p) {
+        if (sorted.isEmpty()) return 0;
+        double pos = p * (sorted.size() - 1);
+        int lower = (int) Math.floor(pos);
+        int upper = (int) Math.ceil(pos);
+        if (lower == upper) return sorted.get(lower);
+        return sorted.get(lower) + (sorted.get(upper) - sorted.get(lower)) * (pos - lower);
+    }
+
+    /**
+     * 基于分位数阈值评分（1-5分）
+     * reverse: true表示值越小得分越高（如R），false表示值越大得分越高（如F、M）
+     */
+    private int getScore(double value, double[] thresholds, boolean reverse) {
+        if (reverse) {
+            if (value <= thresholds[0]) return 5;
+            if (value <= thresholds[1]) return 4;
+            if (value <= thresholds[2]) return 3;
+            if (value <= thresholds[3]) return 2;
+            return 1;
+        } else {
+            if (value <= thresholds[0]) return 1;
+            if (value <= thresholds[1]) return 2;
+            if (value <= thresholds[2]) return 3;
+            if (value <= thresholds[3]) return 4;
+            return 5;
+        }
     }
 
     private long daysBetween(Date start, LocalDate end) {

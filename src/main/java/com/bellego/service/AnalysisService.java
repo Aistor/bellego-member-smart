@@ -17,4 +17,5 @@ public interface AnalysisService {
     List<DailyConsumeVO> dailyConsume();
     List<MemberGrowthVO> memberGrowth(String date);
     List<MemberCategoryVO> memberCategory(String date);
+    String getStartDate();
 }

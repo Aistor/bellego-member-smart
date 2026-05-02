@@ -51,13 +51,11 @@ public class AnalysisController {
     }
 
     @GetMapping("/behavior/level-count")
-    @PreAuthorize("hasAuthority('analysis:view')")
     public Result<List<MemberLevelCountVO>> levelCount() {
         return ResultBuilder.success(analysisService.levelCount());
     }
 
     @GetMapping("/behavior/daily-consume")
-    @PreAuthorize("hasAuthority('analysis:view')")
     public Result<List<DailyConsumeVO>> dailyConsume() {
         return ResultBuilder.success(analysisService.dailyConsume());
     }
@@ -72,5 +70,10 @@ public class AnalysisController {
     @PreAuthorize("hasAuthority('analysis:view')")
     public Result<List<MemberGrowthVO>> memberGrowth(@RequestParam(required = false) String date) {
         return ResultBuilder.success(analysisService.memberGrowth(date));
+    }
+
+    @GetMapping("/start-date")
+    public Result<String> getStartDate() {
+        return ResultBuilder.success(analysisService.getStartDate());
     }
 }
