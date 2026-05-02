@@ -27,9 +27,11 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -66,28 +68,45 @@ public class AnalysisServiceImpl implements AnalysisService {
         }
         // 根据date筛选消费记录
         LambdaQueryWrapper<MemberConsumption> consumptionWrapper = new LambdaQueryWrapper<>();
-        LambdaQueryWrapper<Member> memberWrapper = new LambdaQueryWrapper<>();
         if (StringUtils.isNotBlank(date)) {
             LocalDate endDate = YearMonth.parse(date, DateTimeFormatter.ofPattern("yyyy-MM")).atEndOfMonth();
             Date endDateTime = Date.from(endDate.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant());
             consumptionWrapper.le(MemberConsumption::getConsumeTime, endDateTime);
-            memberWrapper.le(Member::getLastConsumeTime, endDateTime);
         }
-        List<Member> members = memberMapper.selectList(memberWrapper);
         List<MemberConsumption> consumptions = consumptionMapper.selectList(consumptionWrapper);
-        Map<String, Long> frequencyMap = consumptions.stream().collect(Collectors.groupingBy(MemberConsumption::getMemberId, Collectors.counting()));
         LocalDate referenceDate = StringUtils.isNotBlank(date)
                 ? YearMonth.parse(date, DateTimeFormatter.ofPattern("yyyy-MM")).atEndOfMonth()
                 : LocalDate.now();
+
+        // 从消费记录中计算每个会员的R、F、M
+        Map<String, Long> frequencyMap = consumptions.stream()
+                .collect(Collectors.groupingBy(MemberConsumption::getMemberId, Collectors.counting()));
+        Map<String, BigDecimal> monetaryMap = consumptions.stream()
+                .collect(Collectors.groupingBy(MemberConsumption::getMemberId,
+                        Collectors.reducing(BigDecimal.ZERO, MemberConsumption::getAmount, BigDecimal::add)));
+        Map<String, Date> lastConsumeMap = new HashMap<>();
+        consumptions.stream()
+                .filter(c -> c.getConsumeTime() != null)
+                .forEach(c -> lastConsumeMap.merge(c.getMemberId(), c.getConsumeTime(),
+                        (existing, incoming) -> incoming.after(existing) ? incoming : existing));
+
+        // 仅从member表获取id和name
+        Map<String, String> memberNameMap = memberMapper.selectList(new LambdaQueryWrapper<>())
+                .stream().collect(Collectors.toMap(Member::getId, m -> m.getName() == null ? "" : m.getName()));
+
+        // 所有出现过的会员ID（有消费记录的）
+        Set<String> memberIds = new HashSet<>(frequencyMap.keySet());
 
         // 收集所有R、F、M值
         List<Double> recencyValues = new ArrayList<>();
         List<Double> frequencyValues = new ArrayList<>();
         List<Double> monetaryValues = new ArrayList<>();
-        for (Member member : members) {
-            long recency = member.getLastConsumeTime() == null ? 999 : ChronoUnit.DAYS.between(member.getLastConsumeTime().toInstant().atZone(ZoneId.systemDefault()).toLocalDate(), referenceDate);
-            long frequency = frequencyMap.getOrDefault(member.getId(), 0L);
-            BigDecimal monetary = member.getTotalConsumption() == null ? BigDecimal.ZERO : member.getTotalConsumption();
+        for (String memberId : memberIds) {
+            long recency = lastConsumeMap.containsKey(memberId)
+                    ? ChronoUnit.DAYS.between(lastConsumeMap.get(memberId).toInstant().atZone(ZoneId.systemDefault()).toLocalDate(), referenceDate)
+                    : 999;
+            long frequency = frequencyMap.getOrDefault(memberId, 0L);
+            BigDecimal monetary = monetaryMap.getOrDefault(memberId, BigDecimal.ZERO);
             recencyValues.add((double) recency);
             frequencyValues.add((double) frequency);
             monetaryValues.add(monetary.doubleValue());
@@ -99,13 +118,15 @@ public class AnalysisServiceImpl implements AnalysisService {
         double[] mThresholds = thresholdsCompute(monetaryValues);
 
         // 基于分位数评分
-        Map<String, Object> result = Map.of("totalMembers", members.size(), "segments", members.stream().map(member -> {
+        Map<String, Object> result = Map.of("totalMembers", memberIds.size(), "segments", memberIds.stream().map(memberId -> {
             Map<String, Object> item = new HashMap<>();
-            long recency = member.getLastConsumeTime() == null ? 999 : ChronoUnit.DAYS.between(member.getLastConsumeTime().toInstant().atZone(ZoneId.systemDefault()).toLocalDate(), referenceDate);
-            long frequency = frequencyMap.getOrDefault(member.getId(), 0L);
-            BigDecimal monetary = member.getTotalConsumption() == null ? BigDecimal.ZERO : member.getTotalConsumption();
-            item.put("memberId", member.getId());
-            item.put("memberName", member.getName());
+            long recency = lastConsumeMap.containsKey(memberId)
+                    ? ChronoUnit.DAYS.between(lastConsumeMap.get(memberId).toInstant().atZone(ZoneId.systemDefault()).toLocalDate(), referenceDate)
+                    : 999;
+            long frequency = frequencyMap.getOrDefault(memberId, 0L);
+            BigDecimal monetary = monetaryMap.getOrDefault(memberId, BigDecimal.ZERO);
+            item.put("memberId", memberId);
+            item.put("memberName", memberNameMap.getOrDefault(memberId, ""));
             item.put("recencyDays", recency);
             item.put("frequency", frequency);
             item.put("monetary", monetary);
