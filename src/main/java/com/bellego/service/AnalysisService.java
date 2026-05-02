@@ -10,12 +10,13 @@ import java.util.Map;
 
 public interface AnalysisService {
     Map<String, Object> rfm(String date);
-    Map<String, Object> orderAmount();
-    Map<String, Object> repurchase();
-    Map<String, Object> timeDistribution();
+    Map<String, Object> orderAmount(String storeId);
+    Map<String, Object> repurchase(String storeId);
+    Map<String, Object> timeDistribution(String storeId);
     List<MemberLevelCountVO> levelCount();
     List<DailyConsumeVO> dailyConsume();
     List<MemberGrowthVO> memberGrowth(String date);
     List<MemberCategoryVO> memberCategory(String date);
     String getStartDate();
+    Map<String, Object> getStoreConsumption(String date);
 }

@@ -8,10 +8,7 @@ import com.bellego.domain.vo.analysis.MemberGrowthVO;
 import com.bellego.domain.vo.analysis.MemberLevelCountVO;
 import com.bellego.service.AnalysisService;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
@@ -32,30 +29,30 @@ public class AnalysisController {
         return ResultBuilder.success(analysisService.rfm(date));
     }
 
-    @GetMapping("/behavior/order-amount")
+    @GetMapping("/order-amount")
     @PreAuthorize("hasAuthority('analysis:view')")
-    public Result<Map<String, Object>> orderAmount() {
-        return ResultBuilder.success(analysisService.orderAmount());
+    public Result<Map<String, Object>> orderAmount(@RequestParam(required = false) String storeId) {
+        return ResultBuilder.success(analysisService.orderAmount(storeId));
     }
 
-    @GetMapping("/behavior/repurchase")
+    @GetMapping("/repurchase")
     @PreAuthorize("hasAuthority('analysis:view')")
-    public Result<Map<String, Object>> repurchase() {
-        return ResultBuilder.success(analysisService.repurchase());
+    public Result<Map<String, Object>> repurchase(@RequestParam(required = false) String storeId) {
+        return ResultBuilder.success(analysisService.repurchase(storeId));
     }
 
-    @GetMapping("/behavior/time-distribution")
+    @GetMapping("/time-distribution")
     @PreAuthorize("hasAuthority('analysis:view')")
-    public Result<Map<String, Object>> timeDistribution() {
-        return ResultBuilder.success(analysisService.timeDistribution());
+    public Result<Map<String, Object>> timeDistribution(@RequestParam(required = false) String storeId) {
+        return ResultBuilder.success(analysisService.timeDistribution(storeId));
     }
 
-    @GetMapping("/behavior/level-count")
+    @GetMapping("/level-count")
     public Result<List<MemberLevelCountVO>> levelCount() {
         return ResultBuilder.success(analysisService.levelCount());
     }
 
-    @GetMapping("/behavior/daily-consume")
+    @GetMapping("/daily-consume")
     public Result<List<DailyConsumeVO>> dailyConsume() {
         return ResultBuilder.success(analysisService.dailyConsume());
     }
@@ -75,5 +72,10 @@ public class AnalysisController {
     @GetMapping("/start-date")
     public Result<String> getStartDate() {
         return ResultBuilder.success(analysisService.getStartDate());
+    }
+
+    @GetMapping("/store-consumption")
+    public Result<Map<String, Object>> getStoreConsumption(@RequestParam(required = false) String date) {
+        return ResultBuilder.success(analysisService.getStoreConsumption(date));
     }
 }

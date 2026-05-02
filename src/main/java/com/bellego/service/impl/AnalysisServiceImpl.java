@@ -5,12 +5,14 @@ import com.baomidou.mybatisplus.core.toolkit.StringUtils;
 import com.bellego.common.exception.BusinessException;
 import com.bellego.domain.entity.Member;
 import com.bellego.domain.entity.MemberConsumption;
+import com.bellego.domain.entity.Store;
 import com.bellego.domain.vo.analysis.DailyConsumeVO;
 import com.bellego.domain.vo.analysis.MemberCategoryVO;
 import com.bellego.domain.vo.analysis.MemberGrowthVO;
 import com.bellego.domain.vo.analysis.MemberLevelCountVO;
 import com.bellego.mapper.MemberConsumptionMapper;
 import com.bellego.mapper.MemberMapper;
+import com.bellego.mapper.StoreMapper;
 import com.bellego.service.AnalysisService;
 import com.bellego.utils.RedisUtils;
 import lombok.extern.slf4j.Slf4j;
@@ -45,11 +47,13 @@ public class AnalysisServiceImpl implements AnalysisService {
     private final RedisUtils redisUtils;
     private final MemberMapper memberMapper;
     private final MemberConsumptionMapper consumptionMapper;
+    private final StoreMapper storeMapper;
 
-    public AnalysisServiceImpl(RedisUtils redisUtils, MemberMapper memberMapper, MemberConsumptionMapper consumptionMapper) {
+    public AnalysisServiceImpl(RedisUtils redisUtils, MemberMapper memberMapper, MemberConsumptionMapper consumptionMapper, StoreMapper storeMapper) {
         this.redisUtils = redisUtils;
         this.memberMapper = memberMapper;
         this.consumptionMapper = consumptionMapper;
+        this.storeMapper = storeMapper;
     }
 
     private static final String REDIS_KEY_PREFIX = "analysis:";
@@ -141,16 +145,20 @@ public class AnalysisServiceImpl implements AnalysisService {
     }
 
     @Override
-    public Map<String, Object> orderAmount() {
-        log.info("开始执行客单价分布分析");
-        String key = REDIS_KEY_PREFIX + "orderAmount";
+    public Map<String, Object> orderAmount(String storeId) {
+        log.info("开始执行客单价分布分析，门店：{}", storeId);
+        String key = REDIS_KEY_PREFIX + "orderAmount:" + (StringUtils.isNotBlank(storeId) ? storeId : "all");
         Map<String, Object> resultMap = (Map) redisUtils.get(key);
         if (resultMap != null) {
             log.info("缓存数据命中，直接返回");
             return resultMap;
         }
         log.info("无缓存数据，重新计算");
-        List<MemberConsumption> consumptions = consumptionMapper.selectList(new LambdaQueryWrapper<>());
+        LambdaQueryWrapper<MemberConsumption> queryWrapper = new LambdaQueryWrapper<>();
+        if (StringUtils.isNotBlank(storeId)) {
+            queryWrapper.eq(MemberConsumption::getStoreId, storeId);
+        }
+        List<MemberConsumption> consumptions = consumptionMapper.selectList(queryWrapper);
         Map<String, Long> bucketCount = new LinkedHashMap<>();
         bucketCount.put("0-100", 0L);
         bucketCount.put("101-300", 0L);
@@ -176,15 +184,19 @@ public class AnalysisServiceImpl implements AnalysisService {
     }
 
     @Override
-    public Map<String, Object> repurchase() {
-        log.info("开始执行复购率分析");
-        String key = REDIS_KEY_PREFIX + "repurchase";
+    public Map<String, Object> repurchase(String storeId) {
+        log.info("开始执行复购率分析，门店：{}", storeId);
+        String key = REDIS_KEY_PREFIX + "repurchase:" + (StringUtils.isNotBlank(storeId) ? storeId : "all");
         Map<String, Object> resultMap = (Map) redisUtils.get(key);
         if (resultMap != null) {
             log.info("缓存数据命中，直接返回");
             return resultMap;
         }
-        List<MemberConsumption> consumptions = consumptionMapper.selectList(new LambdaQueryWrapper<>());
+        LambdaQueryWrapper<MemberConsumption> queryWrapper = new LambdaQueryWrapper<>();
+        if (StringUtils.isNotBlank(storeId)) {
+            queryWrapper.eq(MemberConsumption::getStoreId, storeId);
+        }
+        List<MemberConsumption> consumptions = consumptionMapper.selectList(queryWrapper);
         Map<String, Long> countByMember = consumptions.stream().collect(Collectors.groupingBy(MemberConsumption::getMemberId, Collectors.counting()));
         long repurchaseMembers = countByMember.values().stream().filter(count -> count >= 2).count();
         long totalMembers = countByMember.size();
@@ -195,18 +207,25 @@ public class AnalysisServiceImpl implements AnalysisService {
     }
 
     @Override
-    public Map<String, Object> timeDistribution() {
-        log.info("开始执行消费时段分析");
-        String key = REDIS_KEY_PREFIX + "timeDistribution";
+    public Map<String, Object> timeDistribution(String storeId) {
+        log.info("开始执行消费时段分析，门店：{}", storeId);
+        String key = REDIS_KEY_PREFIX + "timeDistribution:" + (StringUtils.isNotBlank(storeId) ? storeId : "all");
         Map<String, Object> resultMap = (Map) redisUtils.get(key);
         if (resultMap != null) {
             log.info("缓存数据命中，直接返回");
             return resultMap;
         }
-        List<MemberConsumption> consumptions = consumptionMapper.selectList(new LambdaQueryWrapper<>());
+        LambdaQueryWrapper<MemberConsumption> queryWrapper = new LambdaQueryWrapper<>();
+        if (StringUtils.isNotBlank(storeId)) {
+            queryWrapper.eq(MemberConsumption::getStoreId, storeId);
+        }
+        List<MemberConsumption> consumptions = consumptionMapper.selectList(queryWrapper);
         Map<Integer, Long> distribution = consumptions.stream()
                 .filter(item -> item.getConsumeTime() != null)
-                .collect(Collectors.groupingBy(item -> item.getConsumeTime().toInstant().atZone(ZoneId.systemDefault()).getHour(), TreeMap::new, Collectors.counting()));
+                .collect(Collectors.groupingBy(item -> {
+                    int hour = item.getConsumeTime().toInstant().atZone(ZoneId.systemDefault()).getHour();
+                    return hour == 0 ? 24 : hour;
+                }, TreeMap::new, Collectors.counting()));
         resultMap = Map.of("distribution", distribution);
         redisUtils.set(key, resultMap, EXPIRE_HOURS, TimeUnit.HOURS);
         return resultMap;
@@ -418,6 +437,45 @@ public class AnalysisServiceImpl implements AnalysisService {
                 .atZone(ZoneId.systemDefault())
                 .toLocalDate()
                 .format(formatter);
+    }
+
+    /**
+     * 获取门店消费数据
+     */
+    @Override
+    public Map<String, Object> getStoreConsumption(String date) {
+        log.info("开始执行门店消费分析，date={}", date);
+        String key = REDIS_KEY_PREFIX + "storeConsumption:" + (StringUtils.isNotBlank(date) ? date : "all");
+        Map<String, Object> resultMap = (Map) redisUtils.get(key);
+        if (resultMap != null) {
+            log.info("缓存数据命中，直接返回");
+            return resultMap;
+        }
+        LambdaQueryWrapper<MemberConsumption> queryWrapper = new LambdaQueryWrapper<>();
+        if (StringUtils.isNotBlank(date)) {
+            YearMonth yearMonth = YearMonth.parse(date, DateTimeFormatter.ofPattern("yyyy-MM"));
+            Date startDateTime = Date.from(yearMonth.atDay(1).atStartOfDay(ZoneId.systemDefault()).toInstant());
+            Date endDateTime = Date.from(yearMonth.atEndOfMonth().plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant());
+            queryWrapper.between(MemberConsumption::getConsumeTime, startDateTime, endDateTime);
+        }
+        List<MemberConsumption> consumptions = consumptionMapper.selectList(queryWrapper);
+        // 按门店分组统计总消费额
+        Map<String, BigDecimal> storeAmountMap = consumptions.stream()
+                .collect(Collectors.groupingBy(MemberConsumption::getStoreId,
+                        Collectors.reducing(BigDecimal.ZERO, MemberConsumption::getAmount, BigDecimal::add)));
+        // 获取门店名称
+        Map<String, String> storeNameMap = storeMapper.selectList(new LambdaQueryWrapper<>())
+                .stream().collect(Collectors.toMap(Store::getId, s -> s.getName() == null ? "" : s.getName()));
+        List<Map<String, Object>> stores = storeAmountMap.entrySet().stream().map(entry -> {
+            Map<String, Object> item = new HashMap<>();
+            item.put("storeId", entry.getKey());
+            item.put("storeName", storeNameMap.getOrDefault(entry.getKey(), ""));
+            item.put("totalAmount", entry.getValue());
+            return item;
+        }).toList();
+        resultMap = Map.of("stores", stores);
+        redisUtils.set(key, resultMap, EXPIRE_HOURS, TimeUnit.HOURS);
+        return resultMap;
     }
 
     /**
