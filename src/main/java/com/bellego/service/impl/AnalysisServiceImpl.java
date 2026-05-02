@@ -1,6 +1,7 @@
 package com.bellego.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.toolkit.StringUtils;
 import com.bellego.common.exception.BusinessException;
 import com.bellego.domain.entity.Member;
 import com.bellego.domain.entity.MemberConsumption;
@@ -51,14 +52,24 @@ public class AnalysisServiceImpl implements AnalysisService {
     private static final String REDIS_KEY_PREFIX = "analysis:";
 
     @Override
-    public Map<String, Object> rfm() {
-        log.info("开始执行RFM分析");
+    public Map<String, Object> rfm(String date) {
+        log.info("开始执行RFM分析，date={}", date);
         List<Member> members = memberMapper.selectList(new LambdaQueryWrapper<>());
-        List<MemberConsumption> consumptions = consumptionMapper.selectList(new LambdaQueryWrapper<>());
+        // 根据date筛选消费记录
+        LambdaQueryWrapper<MemberConsumption> queryWrapper = new LambdaQueryWrapper<>();
+        if (StringUtils.isNotBlank(date)) {
+            LocalDate endDate = YearMonth.parse(date, DateTimeFormatter.ofPattern("yyyy-MM")).atEndOfMonth();
+            Date endDateTime = Date.from(endDate.plusDays(1).atStartOfDay(ZoneId.systemDefault()).toInstant());
+            queryWrapper.le(MemberConsumption::getConsumeTime, endDateTime);
+        }
+        List<MemberConsumption> consumptions = consumptionMapper.selectList(queryWrapper);
         Map<String, Long> frequencyMap = consumptions.stream().collect(Collectors.groupingBy(MemberConsumption::getMemberId, Collectors.counting()));
+        LocalDate referenceDate = StringUtils.isNotBlank(date)
+                ? YearMonth.parse(date, DateTimeFormatter.ofPattern("yyyy-MM")).atEndOfMonth()
+                : LocalDate.now();
         return Map.of("totalMembers", members.size(), "segments", members.stream().map(member -> {
             Map<String, Object> item = new HashMap<>();
-            long recency = member.getLastConsumeTime() == null ? 999 : ChronoUnit.DAYS.between(member.getLastConsumeTime().toInstant().atZone(ZoneId.systemDefault()).toLocalDate(), LocalDate.now());
+            long recency = member.getLastConsumeTime() == null ? 999 : ChronoUnit.DAYS.between(member.getLastConsumeTime().toInstant().atZone(ZoneId.systemDefault()).toLocalDate(), referenceDate);
             long frequency = frequencyMap.getOrDefault(member.getId(), 0L);
             BigDecimal monetary = member.getTotalConsumption() == null ? BigDecimal.ZERO : member.getTotalConsumption();
             item.put("memberId", member.getId());
@@ -201,7 +212,7 @@ public class AnalysisServiceImpl implements AnalysisService {
     @Override
     public List<MemberCategoryVO> memberCategory(String date) {
         log.info("开始执行会员类型分析");
-        String key = REDIS_KEY_PREFIX + "memberCategory:" + (date.isBlank() ? "all" : date);
+        String key = REDIS_KEY_PREFIX + "memberCategory:" + (StringUtils.isBlank(date) ? "all" : date);
         List<MemberCategoryVO> resultList = (List) redisUtils.get(key);
         if (resultList != null) {
             log.info("缓存数据命中，直接返回");
@@ -247,14 +258,14 @@ public class AnalysisServiceImpl implements AnalysisService {
 
     @Override
     public List<MemberGrowthVO> memberGrowth(String date) {
-        String key = REDIS_KEY_PREFIX + "memberGrowth:" + (date.isBlank() ? "all" : date);
+        String key = REDIS_KEY_PREFIX + "memberGrowth:" + (StringUtils.isBlank(date) ? "all" : date);
         List<MemberGrowthVO> resultList = (List) redisUtils.get(key);
         if (resultList != null) {
             log.info("会员增长数，缓存数据命中，直接返回");
             return resultList;
         }
         log.info("会员增长数，无缓存数据，重新计算");
-        if (date.isBlank()) {
+        if (StringUtils.isBlank(date)) {
             // date为空，查询所有月份的会员增长数
             resultList = getMonthsGrowth();
         } else {

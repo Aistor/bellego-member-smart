@@ -28,8 +28,8 @@ public class AnalysisController {
 
     @GetMapping("/rfm")
     @PreAuthorize("hasAuthority('analysis:view')")
-    public Result<Map<String, Object>> rfm() {
-        return ResultBuilder.success(analysisService.rfm());
+    public Result<Map<String, Object>> rfm(@RequestParam(required = false) String date) {
+        return ResultBuilder.success(analysisService.rfm(date));
     }
 
     @GetMapping("/behavior/order-amount")

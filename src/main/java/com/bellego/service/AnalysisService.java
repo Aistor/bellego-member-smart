@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.Map;
 
 public interface AnalysisService {
-    Map<String, Object> rfm();
+    Map<String, Object> rfm(String date);
     Map<String, Object> orderAmount();
     Map<String, Object> repurchase();
     Map<String, Object> timeDistribution();
